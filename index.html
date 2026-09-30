@@ -37,6 +37,38 @@
     border-radius: 2px;
   }
   #drift-toggle:hover { background: rgba(79, 209, 255, 0.08); }
+  #view-toggle {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    left: 160px;
+    background: transparent;
+    color: #4fd1ff;
+    border: 1px solid #2a6a80;
+    padding: 8px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  #view-toggle:hover { background: rgba(79, 209, 255, 0.08); }
+  #glitch-toggle {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    left: 280px;
+    background: transparent;
+    color: #4fd1ff;
+    border: 1px solid #2a6a80;
+    padding: 8px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  #glitch-toggle:hover { background: rgba(79, 209, 255, 0.08); }
 </style>
 </head>
 <body>
@@ -47,6 +79,8 @@
   <span class="dim">drag orbit · scroll/pinch zoom · WASD pan</span>
 </div>
 <button id="drift-toggle" type="button">Stop idle drift</button>
+<button id="view-toggle" type="button">Dot view</button>
+<button id="glitch-toggle" type="button">Hide glitch cubes</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -78,7 +112,7 @@
 
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(BG_COLOR);
-  scene.fog = new THREE.Fog(BG_COLOR, 90, 520);
+  scene.fog = new THREE.Fog(BG_COLOR, 170, 950);
 
   var camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.5, 1800);
   var renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -150,8 +184,8 @@
     if (win !== false && h > 3) addWindows(b);
     return b;
   }
-  function localPoint(b, lastPointerX, lastPointerY, lz) {
-    return [b.x + lastPointerX * b.c + lz * b.s, b.cy + lastPointerY, b.z - lastPointerX * b.s + lz * b.c];
+  function localPoint(b, localX, localY, localZ) {
+    return [b.x + localX * b.c + localZ * b.s, b.cy + localY, b.z - localX * b.s + localZ * b.c];
   }
   function facePoint(b, f, u, y, n) {
     if (f === 0) return localPoint(b, u, y, n);
@@ -441,6 +475,42 @@
     + typeCounts.hospital + " hospitals · " + typeCounts.park + " parks";
 
   // ---------- build GPU objects: 1 buildingMesh solid + 4 line batches ----------
+  // ---------- glitch cubes: small blocks poking irregularly out of walls ----------
+  //
+  // Reference: the actual Cyberpunk 2077 "engram" cyberspace isn't a clean
+  // wireframe — it's a dense field of small cubes/voxels, most flush with
+  // a surface but some randomly displaced outward, giving a noisy, glitchy
+  // silhouette instead of a smooth edge. This scatters a handful of small
+  // cubes per building across its 4 side faces, each pushed out from the
+  // wall by a random amount (0 = flush, up to ~1.4 units = clearly poking
+  // out) — same idea as addWindows()'s face sampling, reused here.
+  var glitchCubes = [];
+  buildingBoxes.forEach(function (b) {
+    if (b.h < 3) return; // skip short buildings, same threshold as windows
+    var count = 6 + Math.floor(randRange(0, 9)); // 6-14 cubes per building
+    for (var i = 0; i < count; i++) {
+      var face = Math.floor(randRange(0, 4)); // one of the 4 side faces
+      var faceLen = face < 2 ? b.w : b.d;
+      var u = randRange(-faceLen / 2, faceLen / 2);
+      var y = randRange(-b.h / 2 + 0.8, b.h / 2 - 0.8);
+      var faceNormalOffset = (face < 2 ? b.d : b.w) / 2;
+      var cubeSize = randRange(0.4, 1.0);
+      // Jitter is scaled to the cube's OWN size and starts at 0, so the
+      // cube center is always between "exactly on the wall surface"
+      // (half embedded, half poking out — reads as emerging from it)
+      // and "just clear of the surface" — never detached and floating.
+      var jitter = randRange(0, cubeSize * 0.9);
+      var pos = facePoint(b, face, u, y, faceNormalOffset + jitter);
+      glitchCubes.push({
+        x: pos[0],
+        y: pos[1],
+        z: pos[2],
+        size: cubeSize,
+        ry: b.ry + randRange(-0.35, 0.35), // slight extra tilt for glitchiness
+      });
+    }
+  });
+
   var buildingMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshBasicMaterial({ color: 0x000000, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
@@ -457,6 +527,23 @@
   buildingMesh.instanceMatrix.needsUpdate = true;
   buildingMesh.frustumCulled = false; // instances live all over the map; the unit-box bounds would cull wrongly
   scene.add(buildingMesh);
+
+  var glitchMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ color: ACCENT_COLOR, fog: true }),
+    glitchCubes.length
+  );
+  glitchCubes.forEach(function (g, i) {
+    tempObj.position.set(g.x, g.y, g.z);
+    tempObj.rotation.set(0, g.ry, 0);
+    tempObj.scale.set(g.size, g.size, g.size);
+    tempObj.updateMatrix();
+    glitchMesh.setMatrixAt(i, tempObj.matrix);
+  });
+  glitchMesh.instanceMatrix.needsUpdate = true;
+  glitchMesh.frustumCulled = false;
+  scene.add(glitchMesh);
+  // Draw calls so far: 2 (main buildings + glitch cubes), regardless of city size.
 
   // ---------- merge all 5 line layers into ONE draw call ----------
   //
@@ -512,10 +599,119 @@
     vertexColors: true,
     fog: true,
   });
-  scene.add(new THREE.LineSegments(mergedGeom, mergedMat));
-  // Total scene draw calls: 1 instanced mesh (all buildings) + 1 merged
-  // line batch (all edges/windows/accents/roads) = 2, regardless of
-  // city size.
+  var lineView = new THREE.LineSegments(mergedGeom, mergedMat);
+  scene.add(lineView);
+
+  // ---------- dot-shader: two-tier density (sparse always, dense up close) ----------
+  //
+  // Two problems with a single fixed-density dot layer: from far away it
+  // looked identical to the line view (too dense to read as "dots"), and
+  // it only ever sampled points ALONG existing edge/window/road lines —
+  // the reference material also has dots FILLING solid surface area
+  // (walls, ground), not just tracing outlines. So this builds two
+  // separate point sets:
+  //   - sparseDotView: coarse sampling of edges/windows/roads only —
+  //     always visible in dot mode, reads as a light outline from any
+  //     distance (this is what was missing: a genuinely sparse look).
+  //   - denseDotView: fine sampling of the same edges/windows/roads,
+  //     PLUS new fill points scattered across building faces and the
+  //     ground — only shown once the camera is close enough, so density
+  //     visibly increases as you zoom in, and surfaces read as "filled
+  //     with dots" rather than just outlined.
+
+  function subdivideToPoints(spacing, outPositions, outColors) {
+    for (var vi = 0; vi < mergedPositions.length; vi += 6) {
+      var x1 = mergedPositions[vi], y1 = mergedPositions[vi + 1], z1 = mergedPositions[vi + 2];
+      var x2 = mergedPositions[vi + 3], y2 = mergedPositions[vi + 4], z2 = mergedPositions[vi + 5];
+      var cr1 = mergedColors[vi], cg1 = mergedColors[vi + 1], cb1 = mergedColors[vi + 2];
+      var cr2 = mergedColors[vi + 3], cg2 = mergedColors[vi + 4], cb2 = mergedColors[vi + 5];
+      var segLen = Math.hypot(x2 - x1, y2 - y1, z2 - z1);
+      var steps = Math.max(1, Math.round(segLen / spacing));
+      for (var s = 0; s <= steps; s++) {
+        var t = s / steps;
+        outPositions.push(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, z1 + (z2 - z1) * t);
+        outColors.push(cr1 + (cr2 - cr1) * t, cg1 + (cg2 - cg1) * t, cb1 + (cb2 - cb1) * t);
+      }
+    }
+  }
+
+  function makePointsObject(positions, colors, size) {
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    var m = new THREE.PointsMaterial({ vertexColors: true, size: size, sizeAttenuation: true, fog: true });
+    var pts = new THREE.Points(g, m);
+    pts.visible = false;
+    scene.add(pts);
+    return pts;
+  }
+
+  // Sparse layer — coarse spacing, always on while in dot mode.
+  var sparsePositions = [];
+  var sparseColors = [];
+  subdivideToPoints(1.4, sparsePositions, sparseColors);
+  var sparseDotView = makePointsObject(sparsePositions, sparseColors, 0.28);
+
+  // Dense layer — fine spacing along the same lines...
+  var densePositions = [];
+  var denseColors = [];
+  subdivideToPoints(0.35, densePositions, denseColors);
+
+  // ...plus actual surface-fill points: scattered across building faces
+  // and the ground, not derived from any line geometry at all. This is
+  // the piece that gives the "solid mass made of dots" look, not just a
+  // denser outline.
+  var fillColorBuilding = blendedColor(WINDOW_COLOR, 0.5);
+  var FILL_SPACING = 1.1;
+  buildingBoxes.forEach(function (b) {
+    if (b.h < 3) return;
+    for (var f = 0; f < 4; f++) {
+      var faceLen = f < 2 ? b.w : b.d;
+      var faceNormalOffset = (f < 2 ? b.d : b.w) / 2 + 0.03;
+      var uCount = Math.max(2, Math.round(faceLen / FILL_SPACING));
+      var yCount = Math.max(2, Math.round(b.h / FILL_SPACING));
+      for (var iu = 0; iu <= uCount; iu++) {
+        var u = -faceLen / 2 + (faceLen * iu) / uCount + randRange(-0.12, 0.12);
+        for (var iy = 0; iy <= yCount; iy++) {
+          var y = -b.h / 2 + (b.h * iy) / yCount + randRange(-0.12, 0.12);
+          var fp = facePoint(b, f, u, y, faceNormalOffset);
+          densePositions.push(fp[0], fp[1], fp[2]);
+          denseColors.push(fillColorBuilding[0], fillColorBuilding[1], fillColorBuilding[2]);
+        }
+      }
+    }
+    // Roof fill — the 4-side loop above never covered the top. Bottom is
+    // deliberately skipped: it sits flush with/under the ground plane
+    // and is never visible from any camera angle.
+    var wCount = Math.max(2, Math.round(b.w / FILL_SPACING));
+    var dCount = Math.max(2, Math.round(b.d / FILL_SPACING));
+    for (var iw = 0; iw <= wCount; iw++) {
+      var lx = -b.w / 2 + (b.w * iw) / wCount + randRange(-0.12, 0.12);
+      for (var id = 0; id <= dCount; id++) {
+        var lz = -b.d / 2 + (b.d * id) / dCount + randRange(-0.12, 0.12);
+        var rp = localPoint(b, lx, b.h / 2 + 0.03, lz);
+        densePositions.push(rp[0], rp[1], rp[2]);
+        denseColors.push(fillColorBuilding[0], fillColorBuilding[1], fillColorBuilding[2]);
+      }
+    }
+  });
+
+  var fillColorGround = blendedColor(GROUND_COLOR, 0.45);
+  var GROUND_FILL_SPACING = 2.4;
+  for (var gx = -CITY_RADIUS; gx <= CITY_RADIUS; gx += GROUND_FILL_SPACING) {
+    for (var gz = -CITY_RADIUS; gz <= CITY_RADIUS; gz += GROUND_FILL_SPACING) {
+      if (Math.hypot(gx, gz) > CITY_RADIUS) continue;
+      densePositions.push(gx + randRange(-0.6, 0.6), 0.02, gz + randRange(-0.6, 0.6));
+      denseColors.push(fillColorGround[0], fillColorGround[1], fillColorGround[2]);
+    }
+  }
+
+  var denseDotView = makePointsObject(densePositions, denseColors, 0.22);
+  var DENSE_DOT_ZOOM_THRESHOLD = 150; // camRadius below this = "zoomed in enough" to show fill
+
+  // Total scene draw calls: 2 instanced meshes (buildings + glitch cubes)
+  // + line view + sparse dots + dense dots (only 2 of these 3 visible at
+  // once) = up to 4, regardless of city size.
 
   // ---------- orbit camera (drag, wheel, pinch, WASD) ----------
   var camTarget = new THREE.Vector3(0, 10, 0);
@@ -583,11 +779,29 @@
     driftBtn.textContent = driftEnabled ? "Stop idle drift" : "Resume idle drift";
   });
 
+  var showingDots = false;
+  var viewBtn = document.getElementById("view-toggle");
+  viewBtn.addEventListener("click", function () {
+    showingDots = !showingDots;
+    lineView.visible = !showingDots;
+    sparseDotView.visible = showingDots;
+    denseDotView.visible = showingDots && camRadius < DENSE_DOT_ZOOM_THRESHOLD;
+    viewBtn.textContent = showingDots ? "Edge view" : "Dot view";
+  });
+
+  var glitchToggleBtn = document.getElementById("glitch-toggle");
+  glitchToggleBtn.addEventListener("click", function () {
+    glitchMesh.visible = !glitchMesh.visible;
+    glitchToggleBtn.textContent = glitchMesh.visible ? "Hide glitch cubes" : "Show glitch cubes";
+  });
+
   function animate() {
     requestAnimationFrame(animate);
     applyPan();
     // idle drift: slow auto-orbit after 4s of no input, unless turned off
     if (driftEnabled && performance.now() - lastInputTime > 4000) { camAzimuth += 0.0008; updateCamera(); }
+    // dot density scales with zoom: dense/fill layer only shows once close enough
+    if (showingDots) denseDotView.visible = camRadius < DENSE_DOT_ZOOM_THRESHOLD;
     renderer.render(scene, camera);
   }
   animate();
