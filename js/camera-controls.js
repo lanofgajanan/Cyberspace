@@ -28,6 +28,18 @@ export function createCameraControls(camera, domElement, options) {
   let driftEnabled = false;
   let driftSpeed = 0.0015;
 
+  // ---------- fly mode: pointer-lock mouselook + WASD flythrough ----------
+  // A second mode alongside orbit, not a replacement — orbit stays
+  // better for surveying the whole city; fly mode is for actually
+  // moving through the streets. Free-fly (Space/Shift = world up/down),
+  // not ground-locked walking — there's no collision/height system here.
+  let flying = false;
+  const flyPos = { x: 0, y: 30, z: 120 };
+  let yaw = 0, pitch = 0;
+  const FLY_SENSITIVITY = 0.0022;
+  const FLY_SPEED_BASE = 1.1;
+  let flySpeedScale = 1.0;
+
   function updateCameraPosition() {
     camera.position.set(
       camTarget.x + camRadius * Math.sin(camPolar) * Math.sin(camAzimuth),
@@ -38,9 +50,9 @@ export function createCameraControls(camera, domElement, options) {
   }
   updateCameraPosition();
 
-  function onDragStart(x, y) { isDragging = true; lastPointerX = x; lastPointerY = y; lastInputTime = performance.now(); }
+  function onDragStart(x, y) { if (flying) return; isDragging = true; lastPointerX = x; lastPointerY = y; lastInputTime = performance.now(); }
   function onDragMove(x, y) {
-    if (!isDragging) return;
+    if (flying || !isDragging) return;
     targetAzimuth -= (x - lastPointerX) * 0.006;
     targetPolar -= (y - lastPointerY) * 0.006;
     targetPolar = Math.max(0.12, Math.min(Math.PI / 2 - 0.02, targetPolar));
@@ -55,6 +67,7 @@ export function createCameraControls(camera, domElement, options) {
 
   domElement.addEventListener("wheel", (e) => {
     e.preventDefault();
+    if (flying) return;
     targetRadius *= 1 + e.deltaY * 0.0012;
     targetRadius = Math.max(8, Math.min(900, targetRadius));
     lastInputTime = performance.now();
@@ -75,8 +88,69 @@ export function createCameraControls(camera, domElement, options) {
   }, { passive: true });
   window.addEventListener("touchend", () => { isDragging = false; });
 
-  window.addEventListener("keydown", (e) => { keysDown[e.key.toLowerCase()] = true; });
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") e.preventDefault(); // stop page scroll — Space is "fly up"
+    keysDown[e.key.toLowerCase()] = true;
+  });
   window.addEventListener("keyup", (e) => { keysDown[e.key.toLowerCase()] = false; });
+
+  // Click the canvas to lock the pointer, but only while in fly mode —
+  // a normal click (e.g. starting an orbit drag) shouldn't try to lock it.
+  domElement.addEventListener("click", () => {
+    if (flying && document.pointerLockElement !== domElement) domElement.requestPointerLock();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!flying || document.pointerLockElement !== domElement) return;
+    yaw -= e.movementX * FLY_SENSITIVITY;
+    pitch -= e.movementY * FLY_SENSITIVITY;
+    pitch = Math.max(-1.5, Math.min(1.5, pitch));
+  });
+
+  function flyForward() {
+    return { x: Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: Math.cos(yaw) * Math.cos(pitch) };
+  }
+  function flyRight() {
+    return { x: -Math.cos(yaw), y: 0, z: Math.sin(yaw) };
+  }
+  function tickFly() {
+    const fwd = flyForward(), right = flyRight();
+    const f = (keysDown.w || keysDown.arrowup ? 1 : 0) - (keysDown.s || keysDown.arrowdown ? 1 : 0);
+    const r = (keysDown.d || keysDown.arrowright ? 1 : 0) - (keysDown.a || keysDown.arrowleft ? 1 : 0);
+    const u = (keysDown[" "] ? 1 : 0) - (keysDown.control ? 1 : 0);
+    const sp = FLY_SPEED_BASE * flySpeedScale;
+    flyPos.x += (fwd.x * f + right.x * r) * sp;
+    flyPos.y += (fwd.y * f + u) * sp;
+    flyPos.z += (fwd.z * f + right.z * r) * sp;
+    camera.position.set(flyPos.x, flyPos.y, flyPos.z);
+    camera.lookAt(flyPos.x + fwd.x, flyPos.y + fwd.y, flyPos.z + fwd.z);
+  }
+
+  function setFlyMode(enabled) {
+    if (enabled === flying) return;
+    if (enabled) {
+      // Start from wherever the orbit camera currently is, facing the
+      // point it was already looking at — no jump on entry.
+      flyPos.x = camera.position.x; flyPos.y = camera.position.y; flyPos.z = camera.position.z;
+      const dx = camTarget.x - flyPos.x, dy = camTarget.y - flyPos.y, dz = camTarget.z - flyPos.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const fwd = { x: dx / len, y: dy / len, z: dz / len };
+      pitch = Math.asin(Math.max(-1, Math.min(1, fwd.y)));
+      yaw = Math.atan2(fwd.x, fwd.z);
+      flying = true;
+    } else {
+      if (document.pointerLockElement === domElement) document.exitPointerLock();
+      // Resume orbit centered on a point out in front of where flying stopped.
+      const fwd = flyForward();
+      const aheadDist = 80;
+      camTarget.x = flyPos.x + fwd.x * aheadDist;
+      camTarget.y = flyPos.y + fwd.y * aheadDist;
+      camTarget.z = flyPos.z + fwd.z * aheadDist;
+      targetAzimuth = camAzimuth = yaw;
+      targetPolar = camPolar = Math.PI / 2 - pitch;
+      targetRadius = camRadius = aheadDist;
+      flying = false;
+    }
+  }
 
   function applyPan() {
     const f = (keysDown.w || keysDown.arrowup ? 1 : 0) - (keysDown.s || keysDown.arrowdown ? 1 : 0);
@@ -98,6 +172,10 @@ export function createCameraControls(camera, domElement, options) {
 
   // Call once per frame from the render loop.
   function tick() {
+    if (flying) {
+      tickFly();
+      return;
+    }
     applyPan();
     if (driftEnabled) targetAzimuth += driftSpeed;
     camAzimuth += (targetAzimuth - camAzimuth) * CAMERA_EASE;
@@ -109,9 +187,11 @@ export function createCameraControls(camera, domElement, options) {
   return {
     tick,
     getRadius: () => camRadius,
+    isFlying: () => flying,
+    setFlyMode,
     setDriftEnabled: (v) => { driftEnabled = v; },
     isDriftEnabled: () => driftEnabled,
     setDriftSpeed: (v) => { driftSpeed = v; },
-    setPanSpeedScale: (v) => { panSpeedScale = v; },
+    setPanSpeedScale: (v) => { panSpeedScale = v; flySpeedScale = v; },
   };
 }

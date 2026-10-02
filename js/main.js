@@ -44,9 +44,11 @@ const ui = wireUI(sceneObjects, cameraControls);
 function animate() {
   requestAnimationFrame(animate);
   cameraControls.tick();
-  // dot density scales with zoom: dense/fill layer only shows once close enough
+  // dot density scales with zoom: dense/fill layer only shows once close
+  // enough (in fly mode there's no "radius," so just always show it —
+  // flying through the streets is inherently "up close")
   if (ui.getShowingDots()) {
-    sceneObjects.denseDotView.visible = cameraControls.getRadius() < sceneObjects.DENSE_DOT_ZOOM_THRESHOLD;
+    sceneObjects.denseDotView.visible = cameraControls.isFlying() || cameraControls.getRadius() < sceneObjects.DENSE_DOT_ZOOM_THRESHOLD;
   }
   renderer.render(scene, camera);
 }

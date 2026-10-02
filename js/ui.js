@@ -24,6 +24,12 @@ export function wireUI(sceneObjects, cameraControls) {
     glitchBtn.textContent = glitchMesh.visible ? "Hide glitch cubes" : "Show glitch cubes";
   });
 
+  const flyBtn = document.getElementById("fly-toggle");
+  flyBtn.addEventListener("click", () => {
+    cameraControls.setFlyMode(!cameraControls.isFlying());
+    flyBtn.textContent = cameraControls.isFlying() ? "Exit fly mode" : "Fly mode";
+  });
+
   const settingsBtn = document.getElementById("settings-toggle");
   const settingsPanel = document.getElementById("settings-panel");
   settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("open"));
