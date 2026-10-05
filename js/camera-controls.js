@@ -39,6 +39,7 @@ export function createCameraControls(camera, domElement, options) {
   const FLY_SENSITIVITY = 0.0022;
   const FLY_SPEED_BASE = 1.1;
   let flySpeedScale = 1.0;
+  let replayPose = null;
 
   function updateCameraPosition() {
     camera.position.set(
@@ -172,6 +173,11 @@ export function createCameraControls(camera, domElement, options) {
 
   // Call once per frame from the render loop.
   function tick() {
+    if (replayPose) {
+      camera.position.copy(replayPose.position);
+      camera.quaternion.copy(replayPose.quaternion);
+      return;
+    }
     if (flying) {
       tickFly();
       return;
@@ -193,5 +199,8 @@ export function createCameraControls(camera, domElement, options) {
     isDriftEnabled: () => driftEnabled,
     setDriftSpeed: (v) => { driftSpeed = v; },
     setPanSpeedScale: (v) => { panSpeedScale = v; flySpeedScale = v; },
+    getCamera: () => camera,
+    setReplayPose: (pose) => { replayPose = pose; },
+    clearReplayPose: () => { replayPose = null; },
   };
 }

@@ -1,5 +1,7 @@
-export function wireUI(sceneObjects, cameraControls) {
-  const { glitchMesh, lineView, sparseDotView, denseDotView, streakMat, DENSE_DOT_ZOOM_THRESHOLD } = sceneObjects;
+export function wireUI(getSceneObjects, cameraControls, replay) {
+  const getObjects = () => getSceneObjects() || {};
+  const initial = getObjects();
+  const { streakMat } = initial;
 
   const driftBtn = document.getElementById("drift-toggle");
   driftBtn.addEventListener("click", () => {
@@ -11,6 +13,7 @@ export function wireUI(sceneObjects, cameraControls) {
   let showingDots = false;
   const viewBtn = document.getElementById("view-toggle");
   viewBtn.addEventListener("click", () => {
+    const { lineView, sparseDotView, denseDotView, DENSE_DOT_ZOOM_THRESHOLD } = getObjects();
     showingDots = !showingDots;
     lineView.visible = !showingDots;
     sparseDotView.visible = showingDots;
@@ -20,6 +23,8 @@ export function wireUI(sceneObjects, cameraControls) {
 
   const glitchBtn = document.getElementById("glitch-toggle");
   glitchBtn.addEventListener("click", () => {
+    const { glitchMesh } = getObjects();
+    if (!glitchMesh) return;
     glitchMesh.visible = !glitchMesh.visible;
     glitchBtn.textContent = glitchMesh.visible ? "Hide glitch cubes" : "Show glitch cubes";
   });
@@ -45,11 +50,28 @@ export function wireUI(sceneObjects, cameraControls) {
   }
   wireSlider("drift-speed-slider", (v) => cameraControls.setDriftSpeed(v));
   wireSlider("pan-speed-slider", (v) => cameraControls.setPanSpeedScale(v));
-  wireSlider("streak-brightness-slider", (v) => streakMat.color.setScalar(v));
+  wireSlider("streak-brightness-slider", (v) => { const objects = getObjects(); if (objects.streakMat) objects.streakMat.color.setScalar(v); });
   wireSlider("fog-slider", (v) => {
+    const objects = getObjects();
+    if (!objects.scene || !objects.scene.fog) return;
     // v is 0 (no fog, far pulled way out) to 1 (fog as originally tuned)
-    sceneObjects.scene.fog.near = 170 + (1 - v) * 2000;
-    sceneObjects.scene.fog.far = 950 + (1 - v) * 4000;
+    objects.scene.fog.near = 170 + (1 - v) * 2000;
+    objects.scene.fog.far = 950 + (1 - v) * 4000;
+  });
+
+  document.getElementById("replay-capture").addEventListener("click", () => replay.capture());
+  document.getElementById("replay-play").addEventListener("click", () => replay.play());
+  document.getElementById("replay-export").addEventListener("click", () => {
+    const blob = new Blob([replay.exportJSON()], { type: "application/json" });
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "cyberspace-replay.json"; link.click();
+    URL.revokeObjectURL(link.href);
+  });
+  const replayFile = document.getElementById("replay-file");
+  document.getElementById("replay-import").addEventListener("click", () => replayFile.click());
+  replayFile.addEventListener("change", async () => {
+    const file = replayFile.files && replayFile.files[0]; if (!file) return;
+    try { replay.importJSON(await file.text()); } catch (error) { document.getElementById("stats").textContent = `replay error: ${error.message}`; }
+    replayFile.value = "";
   });
 
   // Tab hides every bit of UI (HUD text, buttons, settings panel) so the

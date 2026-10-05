@@ -31,6 +31,22 @@ build step at all — there's no bundler, no `npm install`, nothing to
 compile. The only external dependency is Three.js itself, loaded via
 the import map in `index.html` from a CDN.
 
+## World modes and replay
+
+The **World profile** selector keeps the original procedural city available
+as **Legacy city** and adds **Megacity vertical slice**, a deterministic
+seeded district scene with terraced shelves, civic/market/archive profiles,
+roads, buildings, stairs, a switchback connector, animated traffic shader
+lines, and the red Blackwall boundary. Both modes use the same
+`init(ctx)`, `update(dt)`, and `dispose()` lifecycle so switching modes
+explicitly releases the previous GPU resources.
+
+Replay controls capture camera waypoints, interpolate positions with
+per-segment Hermite timing and orientations with quaternion slerp, and
+support validated JSON import/export. During playback replay owns the camera;
+stopping restores normal orbit/fly controls. The megacity generator exposes
+diagnostics for chunk/worker readiness and seeded heightfield state.
+
 ## File structure
 
 ```
@@ -59,6 +75,9 @@ js/
                                      external OrbitControls dependency)
   ui.js                              Wires HUD buttons + settings sliders
   main.js                            Entry point — ties everything together
+  lifecycle.js                       Explicit init/update/dispose mode shell
+  megacity-generator.js              Seeded terrace + vertical-slice generator
+  camera-replay.js                   Waypoint capture, validation and playback
 ```
 
 ## Why it's split this way
