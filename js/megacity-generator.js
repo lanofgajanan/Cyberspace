@@ -144,10 +144,12 @@ export function generateMegacity(seed = 4242) {
     }
     pushLoop(groundVerts, pts, y);
   }
-  // Arterials, district cross streets, and a transit ring.
+  // Arterials, district cross streets, and a transit ring. The central
+  // district owns the inner 125m, so the citywide spokes stop at its
+  // transition ring instead of cutting through its civic core.
   for (let i = 0; i < 16; i++) {
     const a = i / 16 * TAU;
-    addRoad([Math.cos(a) * 34, Math.sin(a) * 34], [Math.cos(a) * CITY_RADIUS, Math.sin(a) * CITY_RADIUS], i % 4 === 0 ? 11 : 6);
+    addRoad([Math.cos(a) * 126, Math.sin(a) * 126], [Math.cos(a) * CITY_RADIUS, Math.sin(a) * CITY_RADIUS], i % 4 === 0 ? 11 : 6);
   }
   const ringRadius = 145;
   for (let i = 0; i < 128; i++) {
@@ -155,13 +157,117 @@ export function generateMegacity(seed = 4242) {
     addRoad([Math.cos(a) * ringRadius, Math.sin(a) * ringRadius], [Math.cos(b) * ringRadius, Math.sin(b) * ringRadius], 9);
   }
 
+  const cityCenter = { roads: 0, blocks: [], lots: [], buildings: 0, terraceY: terrainY(0, 0) + 3 };
+  const centerRng = (() => {
+    let state = (seed ^ 0x9e3779b9) >>> 0;
+    return () => {
+      state ^= state << 13; state >>>= 0;
+      state ^= state >>> 17; state >>>= 0;
+      state ^= state << 5; state >>>= 0;
+      return state / 4294967296;
+    };
+  })();
+  function addCenterRoad(a, b, width, tier, glow = true) {
+    const y = cityCenter.terraceY;
+    roads.push({ a, b, width, tier, district: "city-center" });
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len * width / 2, nz = dx / len * width / 2;
+    line(groundVerts, [a[0] + nx, y + 0.12, a[1] + nz], [b[0] + nx, y + 0.12, b[1] + nz]);
+    line(groundVerts, [a[0] - nx, y + 0.12, a[1] - nz], [b[0] - nx, y + 0.12, b[1] - nz]);
+    line(centerlineVerts, [a[0], y + 0.2, a[1]], [b[0], y + 0.2, b[1]]);
+    if (glow) line(trafficVerts, [a[0], y + 0.28, a[1]], [b[0], y + 0.28, b[1]]);
+    cityCenter.roads++;
+  }
+  function addCenterLoop(radius, segments, width, tier) {
+    for (let i = 0; i < segments; i++) {
+      const a = i / segments * TAU, b = (i + 1) / segments * TAU;
+      addCenterRoad([Math.cos(a) * radius, Math.sin(a) * radius], [Math.cos(b) * radius, Math.sin(b) * radius], width, tier);
+    }
+  }
+  function addCenterBuilding(lot, style) {
+    const before = buildingBoxes.length;
+    const y = cityCenter.terraceY;
+    const ry = lot.ry || 0;
+    if (style === "tower") {
+      addBox(lot.x, y, lot.z, lot.w + 4, 9, lot.d + 4, ry, false);
+      addBox(lot.x, y + 9, lot.z, lot.w * 0.62, lot.h - 9, lot.d * 0.62, ry, true);
+      line(accentVerts, [lot.x - lot.w * 0.3, y + lot.h, lot.z], [lot.x + lot.w * 0.3, y + lot.h, lot.z]);
+      if (lot.h > 62) line(accentVerts, [lot.x, y + lot.h, lot.z], [lot.x, y + lot.h + 11, lot.z]);
+    } else if (style === "civic") {
+      addBox(lot.x, y, lot.z, lot.w, lot.h, lot.d, ry, true);
+      addBox(lot.x, y + lot.h, lot.z, lot.w * 0.72, 3, lot.d * 0.72, ry, false);
+      line(accentVerts, [lot.x - lot.w / 2, y + lot.h + 0.2, lot.z], [lot.x + lot.w / 2, y + lot.h + 0.2, lot.z]);
+    } else {
+      addBox(lot.x, y, lot.z, lot.w, lot.h, lot.d, ry, true);
+      if (style === "podium") addBox(lot.x, y + lot.h, lot.z, lot.w * 0.76, 4, lot.d * 0.76, ry, false);
+    }
+    cityCenter.buildings += buildingBoxes.length - before;
+  }
+  function buildCityCenter() {
+    const y = cityCenter.terraceY;
+    pushLoop(groundVerts, [[-124, -124], [124, -124], [124, 124], [-124, 124]], y);
+    addCenterLoop(112, 48, 10, "transition");
+    addCenterLoop(48, 32, 8, "civic-ring");
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * TAU;
+      addCenterRoad([Math.cos(a) * 48, Math.sin(a) * 48], [Math.cos(a) * 112, Math.sin(a) * 112], i % 2 ? 7 : 11, "arterial");
+    }
+    const edges = [-100, -66, -30, 10, 48, 84, 100];
+    for (let i = 1; i < edges.length - 1; i++) {
+      addCenterRoad([-100, edges[i]], [100, edges[i]], 5, "secondary", false);
+      addCenterRoad([edges[i], -100], [edges[i], 100], 5, "secondary", false);
+    }
+    // Short alleys sit inside the secondary grid, leaving service access and
+    // a readable margin around every authored building footprint.
+    [-83, -48, -10, 29, 66, 83].forEach((p) => {
+      addCenterRoad([-100, p], [-66, p], 2.5, "service", false);
+      addCenterRoad([48, p], [84, p], 2.5, "service", false);
+      addCenterRoad([p, -100], [p, -66], 2.5, "service", false);
+      addCenterRoad([p, 48], [p, 84], 2.5, "service", false);
+    });
+    pushLoop(accentVerts, [[-31, -31], [31, -31], [31, 31], [-31, 31]], y + 0.3);
+    pushLoop(groundVerts, [[-23, -23], [23, -23], [23, 23], [-23, 23]], y + 0.2);
+    addCenterBuilding({ x: 0, z: -37, w: 18, d: 8, h: 14 }, "civic");
+    addCenterBuilding({ x: 0, z: 37, w: 18, d: 8, h: 14 }, "civic");
+    // A clipped orthogonal parcel grid keeps the lots legible around the
+    // civic ring while naturally transitioning into the neighboring districts.
+    for (let xi = 0; xi < edges.length - 1; xi++) for (let zi = 0; zi < edges.length - 1; zi++) {
+      const x0 = edges[xi], x1 = edges[xi + 1], z0 = edges[zi], z1 = edges[zi + 1];
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      if (Math.hypot(cx, cz) < 51 || Math.hypot(cx, cz) > 105) continue;
+      const block = { x: cx, z: cz, w: x1 - x0, d: z1 - z0, tier: Math.hypot(cx, cz) < 76 ? "core" : "edge" };
+      cityCenter.blocks.push(block);
+      pushLoop(groundVerts, [[x0 + 2, z0 + 2], [x1 - 2, z0 + 2], [x1 - 2, z1 - 2], [x0 + 2, z1 - 2]], y + 0.35);
+      const lotW = (block.w - 13) / 2, lotD = (block.d - 13) / 2;
+      for (let lx = 0; lx < 2; lx++) for (let lz = 0; lz < 2; lz++) {
+        const x = x0 + 5.5 + lx * (lotW + 3), z = z0 + 5.5 + lz * (lotD + 3);
+        const h = block.tier === "core" ? 34 + centerRng() * 34 : 22 + centerRng() * 28;
+        const lot = { x, z, w: lotW, d: lotD, h, ry: (centerRng() - 0.5) * 0.08, block: cityCenter.blocks.length - 1 };
+        cityCenter.lots.push(lot);
+        addCenterBuilding(lot, h > 52 && centerRng() > 0.35 ? "tower" : "podium");
+      }
+    }
+    // Four civic landmarks frame the open plaza without filling it.
+    [[-66, -66, 76], [66, -66, 92], [66, 66, 70], [-66, 66, 84]].forEach(([x, z, h]) => {
+      const lot = { x, z, w: 18, d: 18, h, ry: 0 };
+      cityCenter.lots.push({ ...lot, landmark: true });
+      addCenterBuilding(lot, "tower");
+    });
+  }
+
   DISTRICT_PROFILES.forEach((profile, districtIndex) => {
     const a = districtIndex / DISTRICT_PROFILES.length * TAU + 0.12;
-    const cx = Math.cos(a) * DISTRICT_RADIUS, cz = Math.sin(a) * DISTRICT_RADIUS;
+    const cx = profile.id === "city-center" ? 0 : Math.cos(a) * DISTRICT_RADIUS;
+    const cz = profile.id === "city-center" ? 0 : Math.sin(a) * DISTRICT_RADIUS;
     const y = terrainY(cx, cz);
     districtCenters.push([cx, cz]);
     const district = { id: profile.id, label: profile.label, profile: profile.kind, x: cx, z: cz, baseY: y, accent: profile.accent };
     districts.push(district);
+    if (profile.id === "city-center") {
+      buildCityCenter();
+      district.cityCenter = cityCenter;
+      return;
+    }
     // Dense 18x18 lots: each lot has a main solid plus profile-specific
     // roofs, machinery, antennas, or terraces, yielding ~5k-10k instances.
     const grid = 18, pitch = 7.2;
@@ -221,6 +327,19 @@ export function generateMegacity(seed = 4242) {
     buildingBoxes, edgeVerts, windowVerts, accentVerts, groundVerts, centerlineVerts, trafficVerts, blackwallVerts,
     districts, shelves, connector, roads, CITY_RADIUS, seed, profiles: DISTRICT_PROFILES,
     stats: `${districts.length} districts · ${buildingBoxes.length} structures · ${roads.length} road segments · ${shelves.length} terraces · seeded ${seed}`,
-    diagnostics: { chunks: 1, worker: typeof Worker !== "undefined", heightfield: "terraced", blackwall: true, density: buildingBoxes.length },
+    diagnostics: {
+      chunks: 1,
+      worker: typeof Worker !== "undefined",
+      heightfield: "terraced",
+      blackwall: true,
+      density: buildingBoxes.length,
+      cityCenter: {
+        roads: cityCenter.roads,
+        blocks: cityCenter.blocks.length,
+        lots: cityCenter.lots.length,
+        buildings: cityCenter.buildings,
+        terraceY: cityCenter.terraceY,
+      },
+    },
   };
 }
