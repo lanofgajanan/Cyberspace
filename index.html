@@ -88,6 +88,7 @@
     error.hidden = false;
     retry.hidden = false;
     loading.hidden = false;
+    loading.classList.remove("is-hidden");
   }
 
   window.cyberspaceLoading = {
@@ -95,6 +96,7 @@
       ready = true;
       clearTimeout(timeout);
       loading.hidden = true;
+      loading.classList.add("is-hidden");
       loading.setAttribute("aria-hidden", "true");
     },
     fail: fail

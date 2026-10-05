@@ -94,6 +94,7 @@ async function selectMode(mode) {
   selectedMode = mode;
   modeSelect.disabled = true;
   loading.hidden = false;
+  loading.classList.remove("is-hidden");
   loadingError.hidden = true;
   loadingRetry.hidden = true;
   setLoadingProgress(5, "Preparing renderer");
