@@ -70,7 +70,12 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
   document.getElementById("replay-import").addEventListener("click", () => replayFile.click());
   replayFile.addEventListener("change", async () => {
     const file = replayFile.files && replayFile.files[0]; if (!file) return;
-    try { replay.importJSON(await file.text()); } catch (error) { document.getElementById("stats").textContent = `replay error: ${error.message}`; }
+    try {
+      replay.importJSON(await file.text());
+    } catch (error) {
+      document.getElementById("stats").textContent = `replay error [E_REPLAY_IMPORT_INVALID]: ${error.message}`;
+      document.getElementById("diagnostics").textContent = "status: replay import rejected";
+    }
     replayFile.value = "";
   });
 

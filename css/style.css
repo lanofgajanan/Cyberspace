@@ -18,6 +18,27 @@
     position: fixed; inset: 0; display: grid; place-items: center;
     color: #4fd1ff; letter-spacing: 0.12em; background: #050b16; z-index: 4;
   }
+  .loading-card {
+    width: min(460px, calc(100vw - 40px)); padding: 24px;
+    border: 1px solid #2a6a80; background: rgba(5, 11, 22, 0.94);
+    box-shadow: 0 0 30px rgba(79, 209, 255, 0.08);
+  }
+  .loading-title { font-size: 12px; margin-bottom: 18px; }
+  .progress-track {
+    height: 6px; border: 1px solid #2a6a80; background: #091625;
+    overflow: hidden;
+  }
+  #loading-progress {
+    width: 0%; height: 100%; background: #4fd1ff;
+    box-shadow: 0 0 10px rgba(79, 209, 255, 0.8);
+    transition: width 0.2s ease;
+  }
+  #loading-status { margin-top: 10px; color: #8fb9c9; font-size: 11px; letter-spacing: 0.06em; }
+  #loading-error {
+    margin-top: 14px; color: #ff8c8c; font-size: 11px;
+    letter-spacing: 0.04em; line-height: 1.5; text-transform: none;
+  }
+  #loading-retry { margin-top: 16px; }
   #mode-panel {
     position: fixed; top: 16px; right: 16px; color: #4fd1ff;
     font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;

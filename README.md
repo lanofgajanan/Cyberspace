@@ -46,6 +46,10 @@ per-segment Hermite timing and orientations with quaternion slerp, and
 support validated JSON import/export. During playback replay owns the camera;
 stopping restores normal orbit/fly controls. The megacity generator exposes
 diagnostics for chunk/worker readiness and seeded heightfield state.
+Mode changes show staged generation progress and keep the selected profile
+recoverable through a retry action if generation or render setup fails.
+User-facing failures include stable codes such as `E_GENERATION_FAILED`,
+`E_SCENE_BUILD_FAILED`, and `E_REPLAY_IMPORT_INVALID` for easier diagnosis.
 
 ## File structure
 
