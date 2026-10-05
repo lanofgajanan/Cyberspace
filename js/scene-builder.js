@@ -77,6 +77,19 @@ function makeLineSegments(positions, colors, material) {
   return new THREE.LineSegments(geom, material);
 }
 
+function makeTrafficLine(verts) {
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  const material = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: "uniform float time; varying float pulse; void main(){ pulse=fract((position.x+position.z)*0.012+time*0.7); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader: "varying float pulse; void main(){ float glow=0.35+0.65*smoothstep(0.0,1.0,pulse); gl_FragColor=vec4(1.0,0.25+glow*0.25,0.08,1.0); }",
+  });
+  const line = new THREE.LineSegments(geom, material);
+  line.userData.tick = (dt) => { material.uniforms.time.value += dt; };
+  return line;
+}
+
 // Builds every renderable object for the scene and returns references
 // the UI/animation loop need to toggle visibility, adjust fog, etc.
 // Total draw calls: 2 instanced meshes (buildings + glitch cubes) + line
@@ -96,6 +109,12 @@ export function buildScene(scene, cityData, glitchCubes) {
   const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, fog: true });
   const lineView = makeLineSegments(mergedPositions, mergedColors, lineMat);
   scene.add(lineView);
+  const trafficLine = cityData.trafficVerts ? makeTrafficLine(cityData.trafficVerts) : null;
+  if (trafficLine) scene.add(trafficLine);
+  const blackwallLine = cityData.blackwallVerts
+    ? makeLineSegments(cityData.blackwallVerts, cityData.blackwallVerts.map((_, i) => i % 3 === 0 ? 1 : 0.08), new THREE.LineBasicMaterial({ color: 0xff2020, fog: true }))
+    : null;
+  if (blackwallLine) scene.add(blackwallLine);
 
   // Two-tier dot/streak system: a coarse "sparse" layer is always shown
   // in dot mode (reads as a light outline from any distance — this is
@@ -124,5 +143,18 @@ export function buildScene(scene, cityData, glitchCubes) {
 
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
-  return { scene, buildingMesh, glitchMesh, lineView, sparseDotView, denseDotView, streakMat, DENSE_DOT_ZOOM_THRESHOLD };
+  return {
+    scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine,
+    sparseDotView, denseDotView, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
+    update: (dt) => { if (trafficLine) trafficLine.userData.tick(dt); },
+    dispose: () => {
+      scene.remove(buildingMesh, glitchMesh, lineView, sparseDotView, denseDotView);
+      if (trafficLine) scene.remove(trafficLine);
+      if (blackwallLine) scene.remove(blackwallLine);
+      [buildingMesh, glitchMesh, lineView, sparseDotView, denseDotView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
+        obj.geometry.dispose();
+        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose()); else obj.material.dispose();
+      });
+    },
+  };
 }

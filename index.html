@@ -10,10 +10,18 @@
 <div id="canvas-wrap"></div>
 <div id="ui-layer">
   <div id="hud">
-    Net // City<br/>
+    Net // <span id="mode-status">legacy city</span><br/>
     <span class="dim" id="stats">generating…</span><br/>
     <span class="dim">drag orbit · scroll/pinch zoom · WASD pan</span><br/>
     <span class="dim">Fly mode: click canvas to lock mouse · look to turn · WASD+Space/Shift move · Esc unlocks · Tab hides this UI</span>
+  </div>
+  <div id="loading">INITIALIZING CITY SIMULATION…</div>
+  <div id="mode-panel">
+    <label for="mode-select">World profile</label>
+    <select id="mode-select">
+      <option value="megacity">Megacity vertical slice</option>
+      <option value="legacy">Legacy city</option>
+    </select>
   </div>
 
   <div id="settings-panel">
@@ -41,6 +49,11 @@
     <button id="glitch-toggle" class="ctl-btn" type="button">Hide glitch cubes</button>
     <button id="settings-toggle" class="ctl-btn" type="button">⚙ Settings</button>
     <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
+    <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
+    <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
+    <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
+    <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
+    <input id="replay-file" type="file" accept="application/json" hidden />
   </div>
 </div>
 
