@@ -115,9 +115,9 @@ async function selectMode(mode) {
     document.getElementById("diagnostics").textContent =
       `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
-    // Completion is intentionally synchronous after the ready state. Waiting
-    // for another animation frame here can strand the overlay at "City ready".
-    loading.hidden = true;
+    // Complete synchronously after the ready state; waiting for another frame
+    // can strand the overlay at "City ready" in throttled pages.
+    window.cyberspaceLoading.ready();
   } catch (error) {
     if (request !== loadRequest) return;
     const details = getErrorDetails(error, "E_MODE_LOAD_FAILED");
@@ -126,6 +126,7 @@ async function selectMode(mode) {
     loadingRetry.hidden = false;
     setLoadingProgress(0, "Generation stopped");
     document.getElementById("diagnostics").textContent = `status: error · ${details.code}`;
+    window.cyberspaceLoading.fail(`${details.code}: ${details.message}`);
   } finally {
     if (request === loadRequest) modeSelect.disabled = false;
   }
