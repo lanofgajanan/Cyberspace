@@ -1,179 +1,226 @@
-import { resetSeed, randRange } from "./rng.js";
+import { resetSeed, nextRandom, randRange } from "./rng.js";
 import { pushSegment, pushLoop } from "./geometry.js";
 
-// Positions are authored rather than laid out from a generic grid. The
-// west-to-east progression gives the city a readable social/topographic axis.
-const DISTRICT_PROFILES = {
-  citadel: { label: "Citadel / civic", height: [42, 92], width: [14, 24], accent: 0x4fd1ff, density: 1.15 },
-  archive: { label: "Archive / data", height: [54, 118], width: [12, 20], accent: 0xc27dff, density: 1.05 },
-  aerium: { label: "Aerium / transit", height: [30, 76], width: [13, 22], accent: 0x68f5d0, density: 1.1 },
-  foundry: { label: "Foundry / industrial", height: [18, 58], width: [14, 28], accent: 0xff704d, density: 1.2 },
-  market: { label: "Market / mixed use", height: [10, 38], width: [11, 22], accent: 0xffb84f, density: 1.3 },
-  commons: { label: "Commons / residential", height: [8, 30], width: [10, 20], accent: 0x8ee58b, density: 1.4 },
-  lowline: { label: "Lowline / floodplain", height: [6, 22], width: [9, 18], accent: 0x52b5ff, density: 1.5 },
-  sprawl: { label: "Sprawl / edge works", height: [5, 18], width: [8, 16], accent: 0xf28cff, density: 1.55 },
-  quarry: { label: "Quarry / extraction", height: [12, 42], width: [12, 24], accent: 0xffdf63, density: 1.25 },
-  blackwall: { label: "Blackwall / frontier", height: [8, 28], width: [9, 19], accent: 0xff4057, density: 1.35 },
-};
-
-const DISTRICTS = [
-  { id: "lowline", x: -300, z: 112, profile: "lowline", cols: 8, rows: 6, rot: -0.08 },
-  { id: "sprawl", x: -240, z: -96, profile: "sprawl", cols: 8, rows: 7, rot: 0.12 },
-  { id: "commons", x: -138, z: 118, profile: "commons", cols: 8, rows: 7, rot: -0.18 },
-  { id: "market", x: -72, z: -84, profile: "market", cols: 8, rows: 8, rot: 0.22 },
-  { id: "foundry", x: 30, z: 128, profile: "foundry", cols: 8, rows: 7, rot: -0.08 },
-  { id: "quarry", x: 108, z: -112, profile: "quarry", cols: 7, rows: 7, rot: 0.16 },
-  { id: "archive", x: 168, z: 80, profile: "archive", cols: 7, rows: 7, rot: -0.16 },
-  { id: "aerium", x: 224, z: -18, profile: "aerium", cols: 8, rows: 7, rot: 0.1 },
-  { id: "citadel", x: 276, z: 148, profile: "citadel", cols: 7, rows: 7, rot: -0.1 },
-  { id: "blackwall", x: 300, z: -142, profile: "blackwall", cols: 8, rows: 6, rot: 0.2 },
+// This module deliberately produces renderer-neutral data. scene-builder.js
+// turns the solids into one InstancedMesh and the line arrays into merged
+// batches, so the city can be dense without multiplying draw calls.
+const DISTRICT_PROFILES = [
+  { id: "watson", label: "Watson / stacked markets", kind: "market", accent: 0xffb84f, height: [8, 34] },
+  { id: "westbrook", label: "Westbrook / corporate spine", kind: "corporate", accent: 0x4fd1ff, height: [28, 86] },
+  { id: "heywood", label: "Heywood / residential terraces", kind: "residential", accent: 0x69e0c0, height: [8, 42] },
+  { id: "santo-domingo", label: "Santo Domingo / industrial", kind: "industrial", accent: 0xff6c4f, height: [12, 55] },
+  { id: "pacifica", label: "Pacifica / flooded arcology", kind: "pacifica", accent: 0x5bd8ff, height: [18, 68] },
+  { id: "dogtown", label: "Dogtown / fortified sprawl", kind: "dogtown", accent: 0xff405f, height: [6, 32] },
+  { id: "city-center", label: "City Center / megatowers", kind: "tower", accent: 0xc27dff, height: [55, 150] },
+  { id: "badlands", label: "Badlands / solar yards", kind: "badlands", accent: 0xffd15b, height: [4, 22] },
+  { id: "arroyo", label: "Arroyo / transit works", kind: "transit", accent: 0x7da8ff, height: [16, 64] },
+  { id: "kabuki", label: "Kabuki / neon bazaar", kind: "bazaar", accent: 0xff65dcff, height: [10, 48] },
 ];
 
-const CITY_RADIUS = 430;
-
-function smoothstep(value) {
-  const t = Math.max(0, Math.min(1, value));
-  return t * t * (3 - 2 * t);
-}
-
-// The rich/east side climbs into a mountain shelf; the poorer west side
-// remains broad and low so the terrain reads as an intentional gradient.
-function heightAt(x, z) {
-  const rich = smoothstep((x + 80) / 510);
-  const ridge = Math.max(0, Math.sin((z + 28) * 0.026)) * smoothstep((x - 80) / 330);
-  const shelf = Math.floor((rich * 7 + ridge * 2) * 2) / 2;
-  return Math.round((shelf * 4 + Math.sin(x * 0.018) * 1.1 + Math.cos(z * 0.024) * 0.9) * 2) / 2;
-}
+const TAU = Math.PI * 2;
+const CITY_RADIUS = 360;
+const DISTRICT_RADIUS = 215;
 
 export function generateMegacity(seed = 4242) {
   resetSeed(seed);
   const buildingBoxes = [], edgeVerts = [], windowVerts = [], accentVerts = [];
   const groundVerts = [], centerlineVerts = [], trafficVerts = [], blackwallVerts = [];
-  const districtAccentLayers = [];
-  const shelves = [], connectors = [], stairs = [], districts = [];
+  const districts = [], shelves = [], roads = [];
+  const districtCenters = [];
 
-  // Irregular contour shelves are cheap merged line geometry, but give the
-  // heightfield enough depth cues to read at the city-wide camera distance.
-  for (let level = 0; level < 10; level++) {
-    const radius = CITY_RADIUS - level * 34;
-    const y = level * 3.5;
+  function terrainY(x, z) {
+    const r = Math.hypot(x, z);
+    const terraces = Math.max(0, 5 - Math.floor(r / 75));
+    return terraces * 4 + Math.sin(x * 0.035) * 1.2 + Math.cos(z * 0.03) * 1.1;
+  }
+  function line(arr, a, b) { pushSegment(arr, a[0], a[1], a[2], b[0], b[1], b[2]); }
+  function boxCorners(b) {
+    const out = [];
+    for (let i = 0; i < 8; i++) {
+      const x = (i & 1 ? 1 : -1) * b.w / 2, y = (i & 2 ? 1 : -1) * b.h / 2, z = (i & 4 ? 1 : -1) * b.d / 2;
+      out.push([b.x + x * b.c + z * b.s, b.cy + y, b.z - x * b.s + z * b.c]);
+    }
+    return out;
+  }
+  function addWindows(b, density = 1) {
+    if (b.h < 7 || density <= 0) return;
+    const rows = Math.min(16, Math.max(1, Math.floor(b.h / 4.2)));
+    const sides = [[b.w, b.d, 0], [b.w, b.d, 1], [b.d, b.w, 2], [b.d, b.w, 3]];
+    sides.forEach(([length, depth, face]) => {
+      const cols = Math.min(12, Math.max(1, Math.floor(length / (4.2 / density))));
+      for (let c = 1; c < cols; c++) {
+        const u = -length / 2 + length * c / cols;
+        const p = (y, n) => {
+          let lx = u, lz = depth / 2 + n;
+          if (face === 1) { lx = -u; lz = -depth / 2 - n; }
+          if (face === 2) { lx = depth / 2 + n; lz = -u; }
+          if (face === 3) { lx = -depth / 2 - n; lz = u; }
+          return [b.x + lx * b.c + lz * b.s, b.cy + y, b.z - lx * b.s + lz * b.c];
+        };
+        for (let r = 0; r <= rows; r++) {
+          const y = -b.h / 2 + 1.5 + (b.h - 2.4) * r / rows;
+          line(windowVerts, p(y - 0.45, 0.025), p(y + 0.45, 0.025));
+        }
+      }
+    });
+  }
+  function addBox(x, y0, z, w, h, d, ry = 0, windows = true, detail = false) {
+    const b = { x, cy: y0 + h / 2, z, w, h, d, ry, c: Math.cos(ry), s: Math.sin(ry) };
+    buildingBoxes.push(b);
+    const cs = boxCorners(b);
+    for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) if (!(i & (1 << k))) {
+      line(edgeVerts, cs[i], cs[i | (1 << k)]);
+    }
+    if (windows) addWindows(b, detail ? 0.65 : 1);
+    return b;
+  }
+  function roofKit(x, y, z, w, d, ry, accent, kind) {
+    if (kind === "tower" || kind === "corporate") {
+      addBox(x, y, z, w * 0.66, randRange(3, 8), d * 0.66, ry, false);
+      line(accentVerts, [x - w * 0.32, y + 0.1, z - d * 0.32], [x + w * 0.32, y + 0.1, z - d * 0.32]);
+      addBox(x, y + 5, z, 0.35, randRange(8, 18), 0.35, 0, false);
+    } else if (kind === "industrial") {
+      addBox(x + w * 0.25, y, z, w * 0.14, randRange(4, 10), d * 0.14, 0, false);
+      line(accentVerts, [x - w / 2, y + 0.2, z], [x + w / 2, y + 0.2, z]);
+    } else {
+      line(accentVerts, [x - w / 2, y + 0.05, z - d / 2], [x + w / 2, y + 0.05, z - d / 2]);
+    }
+    if (accent) line(accentVerts, [x - w * 0.4, y + 0.08, z], [x + w * 0.4, y + 0.08, z]);
+  }
+  function addRoad(a, b, width = 7, glow = true) {
+    roads.push({ a, b, width });
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len * width / 2, nz = dx / len * width / 2;
+    line(groundVerts, [a[0] + nx, terrainY(a[0], a[1]) + 0.12, a[1] + nz], [b[0] + nx, terrainY(b[0], b[1]) + 0.12, b[1] + nz]);
+    line(groundVerts, [a[0] - nx, terrainY(a[0], a[1]) + 0.12, a[1] - nz], [b[0] - nx, terrainY(b[0], b[1]) + 0.12, b[1] - nz]);
+    line(centerlineVerts, [a[0], terrainY(a[0], a[1]) + 0.2, a[1]], [b[0], terrainY(b[0], b[1]) + 0.2, b[1]]);
+    if (glow) line(trafficVerts, [a[0], terrainY(a[0], a[1]) + 0.28, a[1]], [b[0], terrainY(b[0], b[1]) + 0.28, b[1]]);
+  }
+  function addPark(cx, cz, y, profile) {
+    pushLoop(groundVerts, [[cx - 30, cz - 22], [cx + 30, cz - 22], [cx + 30, cz + 22], [cx - 30, cz + 22]], y + 0.15);
+    pushLoop(accentVerts, [[cx - 18, cz - 10], [cx + 18, cz - 10], [cx + 18, cz + 10], [cx - 18, cz + 10]], y + 0.2);
+    for (let i = 0; i < 24; i++) {
+      const x = cx + randRange(-26, 26), z = cz + randRange(-18, 18);
+      addBox(x, y, z, 0.7, randRange(2, 4), 0.7, 0, false);
+      addBox(x, y + 3, z, randRange(2, 4), randRange(1, 3), randRange(2, 4), randRange(0, TAU), false);
+    }
+    line(accentVerts, [cx - 22, y + 0.25, cz], [cx + 22, y + 0.25, cz]);
+    if (profile.kind === "pacifica") pushLoop(groundVerts, [[cx - 10, cz - 6], [cx + 10, cz - 6], [cx + 10, cz + 6], [cx - 10, cz + 6]], y + 0.3);
+  }
+  function addLot(cx, cz, y, profile, row, col) {
+    const w = randRange(5.2, 10.5), d = randRange(5.2, 10.5);
+    const variation = ((row * 7 + col * 3) % 5) * 0.08;
+    let h = randRange(profile.height[0], profile.height[1]) * (1 + variation);
+    if (profile.kind === "tower") h += 35 * Math.max(0, 1 - Math.hypot(cx, cz) / 260);
+    if (profile.kind === "badlands") h *= 0.5;
+    if (profile.kind === "dogtown") h = Math.min(h, randRange(10, 30));
+    const ry = profile.kind === "bazaar" ? randRange(-0.18, 0.18) : 0;
+    addBox(cx, y, cz, w, h, d, ry, true, h < 14);
+    if (profile.kind === "industrial") {
+      addBox(cx + randRange(-2, 2), y + h, cz + randRange(-2, 2), randRange(1, 3), randRange(3, 12), randRange(1, 3), 0, false);
+      line(accentVerts, [cx - w / 2, y + h * 0.55, cz], [cx + w / 2, y + h * 0.55, cz]);
+    } else if (profile.kind === "pacifica") {
+      addBox(cx, y + h, cz, w * 0.72, randRange(2, 5), d * 0.72, ry, false);
+      line(accentVerts, [cx - w / 2, y + 1, cz - d / 2], [cx - w / 2, y + h - 1, cz - d / 2]);
+    } else if (profile.kind === "dogtown") {
+      addBox(cx + randRange(-3, 3), y + h, cz + randRange(-3, 3), w * 0.4, randRange(1, 3), d * 0.4, ry, false);
+    } else {
+      roofKit(cx, y + h, cz, w, d, ry, profile.accent, profile.kind);
+    }
+    if (h > 52 && nextRandom() < 0.7) {
+      line(accentVerts, [cx, y + h, cz], [cx, y + h + randRange(5, 15), cz]);
+    }
+  }
+
+  // Terraced terrain and a few contour seams make elevation readable even
+  // when the renderer is in solid/line mode.
+  for (let level = 0; level < 6; level++) {
+    const radius = CITY_RADIUS - level * 58, y = level * 4;
     shelves.push({ level, radius, y });
     const pts = [];
     for (let i = 0; i < 64; i++) {
-      const a = (i / 64) * Math.PI * 2;
-      const x = Math.cos(a) * radius;
-      const z = Math.sin(a) * radius;
-      pts.push([x, z]);
+      const a = i / 64 * TAU, rr = radius + Math.sin(a * 5 + level) * 4;
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
     }
     pushLoop(groundVerts, pts, y);
   }
-
-  function addBox(x, baseY, z, w, h, d, rot, style) {
-    const b = { x, cy: baseY + h / 2, z, w, h, d, ry: rot, c: Math.cos(rot), s: Math.sin(rot), style };
-    buildingBoxes.push(b);
-    const corners = [];
-    for (let i = 0; i < 8; i++) {
-      const lx = (i & 1 ? 1 : -1) * w / 2, ly = (i & 2 ? 1 : -1) * h / 2, lz = (i & 4 ? 1 : -1) * d / 2;
-      corners.push([x + lx * b.c + lz * b.s, b.cy + ly, z - lx * b.s + lz * b.c]);
-    }
-    for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) if (!(i & (1 << k))) {
-      const a = corners[i], q = corners[i | (1 << k)];
-      pushSegment(edgeVerts, a[0], a[1], a[2], q[0], q[1], q[2]);
-    }
-    // A restrained facade cross is enough to distinguish profiles without
-    // multiplying meshes or draw calls.
-    if (h > 24) {
-      const y0 = baseY + Math.min(h * 0.32, 18), y1 = baseY + h * 0.78;
-      pushSegment(windowVerts, x - w * 0.34, y0, z - d / 2 - 0.1, x + w * 0.34, y0, z - d / 2 - 0.1);
-      pushSegment(windowVerts, x, y0, z - d / 2 - 0.1, x, y1, z - d / 2 - 0.1);
-    }
+  // Arterials, district cross streets, and a transit ring.
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * TAU;
+    addRoad([Math.cos(a) * 34, Math.sin(a) * 34], [Math.cos(a) * CITY_RADIUS, Math.sin(a) * CITY_RADIUS], i % 4 === 0 ? 11 : 6);
+  }
+  const ringRadius = 145;
+  for (let i = 0; i < 128; i++) {
+    const a = i / 128 * TAU, b = (i + 1) / 128 * TAU;
+    addRoad([Math.cos(a) * ringRadius, Math.sin(a) * ringRadius], [Math.cos(b) * ringRadius, Math.sin(b) * ringRadius], 9);
   }
 
-  DISTRICTS.forEach((spec, districtIndex) => {
-    const profile = DISTRICT_PROFILES[spec.profile];
-    const baseY = heightAt(spec.x, spec.z);
-    const accentLayer = [];
-    const district = {
-      id: spec.id, profile: spec.profile, label: profile.label, x: spec.x, z: spec.z,
-      baseY, accent: profile.accent, area: { width: 104, depth: 92 },
-    };
+  DISTRICT_PROFILES.forEach((profile, districtIndex) => {
+    const a = districtIndex / DISTRICT_PROFILES.length * TAU + 0.12;
+    const cx = Math.cos(a) * DISTRICT_RADIUS, cz = Math.sin(a) * DISTRICT_RADIUS;
+    const y = terrainY(cx, cz);
+    districtCenters.push([cx, cz]);
+    const district = { id: profile.id, label: profile.label, profile: profile.kind, x: cx, z: cz, baseY: y, accent: profile.accent };
     districts.push(district);
-    districtAccentLayers.push({ verts: accentLayer, color: profile.accent });
-
-    for (let row = 0; row < spec.rows; row++) {
-      for (let col = 0; col < spec.cols; col++) {
-        const u = (col - (spec.cols - 1) / 2) * 13;
-        const v = (row - (spec.rows - 1) / 2) * 13;
-        const x = spec.x + u * Math.cos(spec.rot) - v * Math.sin(spec.rot) + randRange(-2.8, 2.8);
-        const z = spec.z + u * Math.sin(spec.rot) + v * Math.cos(spec.rot) + randRange(-2.8, 2.8);
-        const h = randRange(profile.height[0], profile.height[1]) * (1 + (col === Math.floor(spec.cols / 2) && row === Math.floor(spec.rows / 2) ? 0.25 : 0));
-        addBox(x, baseY + heightAt(x, z) - baseY, z, randRange(profile.width[0], profile.width[1]), h, randRange(profile.width[0], profile.width[1]), spec.rot + randRange(-0.1, 0.1), spec.profile);
+    // Dense 18x18 lots: each lot has a main solid plus profile-specific
+    // roofs, machinery, antennas, or terraces, yielding ~5k-10k instances.
+    const grid = 18, pitch = 7.2;
+    for (let row = 0; row < grid; row++) for (let col = 0; col < grid; col++) {
+      const lx = (col - (grid - 1) / 2) * pitch + randRange(-0.7, 0.7);
+      const lz = (row - (grid - 1) / 2) * pitch + randRange(-0.7, 0.7);
+      if (profile.kind === "badlands" && (row + col) % 4 === 0) {
+        addBox(cx + lx, y, cz + lz, 5, randRange(2, 6), 5, 0, false);
+        line(accentVerts, [cx + lx - 2, y + 0.2, cz + lz], [cx + lx + 2, y + 0.2, cz + lz]);
+      } else addLot(cx + lx, cz + lz, y, profile, row, col);
+    }
+    // Every district has a recognizable civic feature rather than being a
+    // generic radial cluster.
+    if (profile.kind === "residential" || profile.kind === "badlands") addPark(cx, cz, y, profile);
+    if (profile.kind === "dogtown") {
+      pushLoop(accentVerts, [[cx - 55, cz - 50], [cx + 55, cz - 50], [cx + 55, cz + 50], [cx - 55, cz + 50]], y + 5);
+      for (let p = -45; p <= 45; p += 15) addBox(cx + p, y, cz - 53, 2, randRange(8, 18), 2, 0, false);
+    }
+    if (profile.kind === "industrial") {
+      for (let p = -34; p <= 34; p += 17) {
+        addBox(cx + p, y, cz + 38, 2, 24, 2, 0, false);
+        line(accentVerts, [cx + p, y + 20, cz + 38], [cx + p + 14, y + 20, cz + 38]);
       }
     }
-
-    const halfW = 59, halfD = 52;
-    pushLoop(groundVerts, [[spec.x - halfW, spec.z - halfD], [spec.x + halfW, spec.z - halfD], [spec.x + halfW, spec.z + halfD], [spec.x - halfW, spec.z + halfD]], baseY + 0.15);
-    for (let i = -2; i <= 2; i++) {
-      const offset = i * 20;
-      const ax = spec.x - halfW, az = spec.z + offset;
-      const bx = spec.x + halfW, bz = spec.z + offset;
-      pushSegment(groundVerts, ax, baseY + 0.22, az, bx, baseY + 0.22, bz);
-      pushSegment(trafficVerts, ax, baseY + 0.28, az, bx, baseY + 0.28, bz);
-      pushSegment(centerlineVerts, ax, baseY + 0.3, az, bx, baseY + 0.3, bz);
+    if (profile.kind === "pacifica") {
+      pushLoop(groundVerts, [[cx - 58, cz - 54], [cx + 58, cz - 54], [cx + 58, cz + 54], [cx - 58, cz + 54]], y + 0.3);
+      for (let p = -45; p <= 45; p += 15) addRoad([cx + p, cz - 48], [cx + p, cz + 48], 4, false);
     }
-    for (let i = -2; i <= 2; i++) {
-      const offset = i * 20;
-      pushSegment(groundVerts, spec.x + offset, baseY + 0.22, spec.z - halfD, spec.x + offset, baseY + 0.22, spec.z + halfD);
+    // Local blocks/roads are deliberately drawn after placement so they read
+    // as lots and lanes instead of a single large empty district.
+    for (let p = -54; p <= 54; p += 18) {
+      addRoad([cx - 58, cz + p], [cx + 58, cz + p], 3, false);
+      addRoad([cx + p, cz - 58], [cx + p, cz + 58], 3, false);
     }
-    // Profile-colored district marker and central civic axis.
-    pushLoop(accentLayer, [[spec.x - 42, spec.z - 35], [spec.x + 42, spec.z - 35], [spec.x + 42, spec.z + 35], [spec.x - 42, spec.z + 35]], baseY + 0.42);
-    pushSegment(accentLayer, spec.x - 38, baseY + 0.45, spec.z, spec.x + 38, baseY + 0.45, spec.z);
   });
 
-  // Three-dimensional links between authored neighborhoods: each has a
-  // walkable stair run, a switchback road, and a bright route marker.
-  for (let i = 0; i < DISTRICTS.length - 1; i++) {
-    const a = DISTRICTS[i], b = DISTRICTS[i + 1];
-    const ay = heightAt(a.x, a.z) + 0.6, by = heightAt(b.x, b.z) + 0.6;
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const length = Math.hypot(dx, dz), nx = -dz / length, nz = dx / length;
-    const points = [];
-    for (let step = 0; step <= 8; step++) {
-      const t = step / 8;
-      const offset = step % 2 ? 10 : -10;
-      points.push([a.x + dx * t + nx * offset, ay + (by - ay) * t, a.z + dz * t + nz * offset]);
-      if (step) {
-        const p = points[step - 1], q = points[step];
-        pushSegment(groundVerts, p[0], p[1], p[2], q[0], q[1], q[2]);
-        pushSegment(accentVerts, p[0] - nx * 2, p[1] + 0.5, p[2] - nz * 2, q[0] - nx * 2, q[1] + 0.5, q[2] - nz * 2);
-      }
-    }
-    connectors.push({ from: a.id, to: b.id, points });
-    const stairCount = Math.max(4, Math.ceil(Math.abs(by - ay) / 1.5));
-    for (let stair = 0; stair < stairCount; stair++) {
-      const t = (stair + 1) / (stairCount + 1);
-      const x = a.x + dx * t, z = a.z + dz * t, y = ay + (by - ay) * t;
-      pushSegment(groundVerts, x - nx * 4, y, z - nz * 4, x + nx * 4, y, z + nz * 4);
-    }
-    stairs.push({ from: a.id, to: b.id, count: stairCount });
+  // Elevated decks and switchback connectors tie the shelves together.
+  const connector = [];
+  for (let i = 0; i < 11; i++) {
+    const x = -315 + i * 63, z = -65 + (i % 2) * 56, y = 5 + i * 2.2;
+    connector.push([x, y, z]);
+    if (i) line(groundVerts, connector[i - 1], [x, y, z]);
+    line(accentVerts, [x - 10, y + 0.4, z], [x + 10, y + 0.4, z]);
+    addBox(x, y, z, 1.1, 1.1, 20, 0, false);
   }
+  districtCenters.forEach(([x, z], i) => {
+    const next = districtCenters[(i + 1) % districtCenters.length];
+    line(accentVerts, [x, terrainY(x, z) + 32, z], [next[0], terrainY(next[0], next[1]) + 32, next[1]]);
+  });
 
-  // Preserve the high contrast playable boundary as a red vertical wall.
-  for (let i = 0; i < 96; i++) {
-    const a = (i / 96) * Math.PI * 2, b = ((i + 1) / 96) * Math.PI * 2;
-    pushSegment(blackwallVerts, Math.cos(a) * (CITY_RADIUS - 8), 2, Math.sin(a) * (CITY_RADIUS - 8), Math.cos(b) * (CITY_RADIUS - 8), 2, Math.sin(b) * (CITY_RADIUS - 8));
-    if (i % 2 === 0) pushSegment(blackwallVerts, Math.cos(a) * (CITY_RADIUS - 8), 2, Math.sin(a) * (CITY_RADIUS - 8), Math.cos(a) * (CITY_RADIUS - 8), 62, Math.sin(a) * (CITY_RADIUS - 8));
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * TAU, b = (i + 1) / 72 * TAU, r = CITY_RADIUS + 3;
+    line(blackwallVerts, [Math.cos(a) * r, 2, Math.sin(a) * r], [Math.cos(b) * r, 2, Math.sin(b) * r]);
+    if (i % 2 === 0) line(blackwallVerts, [Math.cos(a) * r, 2, Math.sin(a) * r], [Math.cos(a) * r, 62, Math.sin(a) * r]);
   }
-
-  const roadCount = trafficVerts.length / 6;
   return {
-    buildingBoxes, edgeVerts, windowVerts, accentVerts, districtAccentLayers, groundVerts,
-    centerlineVerts, trafficVerts, blackwallVerts, districts, shelves, connectors, stairs,
-    CITY_RADIUS, seed, profiles: DISTRICT_PROFILES,
-    stats: `${districts.length} districts · ${buildingBoxes.length} structures · ${roadCount} road segments · ${shelves.length} terrain shelves · seeded ${seed}`,
-    diagnostics: {
-      chunks: 1, worker: typeof Worker !== "undefined", heightfield: "rich-east mountain / poor-west taper",
-      blackwall: true, connectors: connectors.length, stairs: stairs.reduce((sum, item) => sum + item.count, 0),
-    },
+    buildingBoxes, edgeVerts, windowVerts, accentVerts, groundVerts, centerlineVerts, trafficVerts, blackwallVerts,
+    districts, shelves, connector, roads, CITY_RADIUS, seed, profiles: DISTRICT_PROFILES,
+    stats: `${districts.length} districts · ${buildingBoxes.length} structures · ${roads.length} road segments · ${shelves.length} terraces · seeded ${seed}`,
+    diagnostics: { chunks: 1, worker: typeof Worker !== "undefined", heightfield: "terraced", blackwall: true, density: buildingBoxes.length },
   };
 }

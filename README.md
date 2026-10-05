@@ -35,12 +35,12 @@ the import map in `index.html` from a CDN.
 
 The **World profile** selector keeps the original procedural city available
 as **Legacy city** and adds **Megacity vertical slice**, a deterministic
-seeded ten-district city spanning a 430-unit radius. It has authored civic,
-archive, transit, industrial, market, residential, floodplain, edge, quarry,
-and frontier profiles; roughly 500+ instanced structures; ten terrain shelves;
-rich-side mountain relief tapering toward the poor side; district-colored road
-markers; explicit stair and switchback links; animated traffic lines; and the
-red Blackwall boundary. Both modes use the same
+seeded ten-district scene with terraced shelves, distinct
+market/corporate/residential/industrial/Pacifica/Dogtown/tower silhouettes,
+dense lots and roads, facade windows, decks, connectors, animated traffic
+shader lines, and the red Blackwall boundary. The megacity targets roughly
+5,000-10,000 instanced structures while keeping line layers merged and dense
+dots lazy. Both modes use the same
 `init(ctx)`, `update(dt)`, and `dispose()` lifecycle so switching modes
 explicitly releases the previous GPU resources.
 
@@ -83,7 +83,7 @@ js/
   ui.js                              Wires HUD buttons + settings sliders
   main.js                            Entry point — ties everything together
   lifecycle.js                       Explicit init/update/dispose mode shell
-  megacity-generator.js              Seeded ten-district megacity + terrain generator
+  megacity-generator.js              Seeded terrace + vertical-slice generator
   camera-replay.js                   Waypoint capture, validation and playback
 ```
 
@@ -113,12 +113,6 @@ window/road/streak geometry is merged into a small, fixed number of
 `LineSegments` batches. Total draw calls stay roughly constant regardless
 of city size — this is what keeps it viable on lower-end hardware, where
 draw-call count (not raw triangle count) is usually the real bottleneck.
-
-Megacity generation remains deterministic and data-driven. The dense surface
-dot layer is still built lazily only after zooming in, while shelves, roads,
-connectors, and district accents are merged into the existing line batch. This
-keeps the large city visible at a glance without forcing a large dense point
-cloud during startup.
 
 ## Known rough edges
 
