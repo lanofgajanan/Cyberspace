@@ -67,6 +67,7 @@ function buildMergedLineData(cityData) {
   appendLayer(cityData.accentVerts, ACCENT_COLOR, 1);
   appendLayer(cityData.groundVerts, GROUND_COLOR, 0.8);
   appendLayer(cityData.centerlineVerts, GROUND_COLOR, 0.45);
+  (cityData.districtAccentLayers || []).forEach((layer) => appendLayer(layer.verts, layer.color, 0.92));
   return { positions, colors };
 }
 
@@ -97,7 +98,7 @@ function makeTrafficLine(verts) {
 // at once) = up to 4, regardless of city size.
 export function buildScene(scene, cityData, glitchCubes) {
   scene.background = new THREE.Color(BG_COLOR);
-  scene.fog = new THREE.Fog(BG_COLOR, 170, 950);
+  scene.fog = new THREE.Fog(BG_COLOR, 260, 1500);
 
   const buildingMesh = buildBuildingMesh(cityData.buildingBoxes);
   scene.add(buildingMesh);

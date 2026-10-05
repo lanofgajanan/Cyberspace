@@ -11,7 +11,7 @@ import { createLifecycle } from "./lifecycle.js";
 
 const canvasWrap = document.getElementById("canvas-wrap");
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 1800);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 2200);
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -21,7 +21,7 @@ try {
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 canvasWrap.appendChild(renderer.domElement);
-const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 10, radius: 330, azimuth: 0.6, polar: 1.05, panLimit: 330 });
+const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 18, radius: 520, azimuth: 0.6, polar: 1.05, panLimit: 430 });
 const replay = createCameraReplay(cameraControls);
 const lifecycle = createLifecycle(({ mode, onProgress }) => {
   resetSeed(mode === "megacity" ? 4242 : 1337);
@@ -112,7 +112,7 @@ async function selectMode(mode) {
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
-    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / vertical slice" : "legacy city";
+    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
     document.getElementById("diagnostics").textContent =
       `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
