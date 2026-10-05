@@ -68,6 +68,48 @@
   </div>
 </div>
 
+<script>
+// This runs before the module graph so import, WebGL, and early startup
+// failures cannot leave the loading panel covering the page forever.
+(function () {
+  var loading = document.getElementById("loading");
+  var status = document.getElementById("loading-status");
+  var error = document.getElementById("loading-error");
+  var retry = document.getElementById("loading-retry");
+  var ready = false;
+  var timeout = setTimeout(function () {
+    window.cyberspaceLoading.fail("E_STARTUP_TIMEOUT: City startup took too long.");
+  }, 30000);
+
+  function fail(message) {
+    if (ready) return;
+    status.textContent = "Generation stopped";
+    error.textContent = message || "E_STARTUP_FAILED: The city could not be started.";
+    error.hidden = false;
+    retry.hidden = false;
+    loading.hidden = false;
+  }
+
+  window.cyberspaceLoading = {
+    ready: function () {
+      ready = true;
+      clearTimeout(timeout);
+      loading.hidden = true;
+      loading.setAttribute("aria-hidden", "true");
+    },
+    fail: fail
+  };
+  retry.addEventListener("click", function () { window.location.reload(); });
+  window.addEventListener("error", function (event) {
+    fail("E_STARTUP_FAILED: " + (event.message || "The city could not be started."));
+  });
+  window.addEventListener("unhandledrejection", function (event) {
+    var reason = event.reason && event.reason.message ? event.reason.message : event.reason;
+    fail("E_STARTUP_FAILED: " + (reason || "The city could not be started."));
+  });
+}());
+</script>
+
 <!-- Import map so every module can just `import * as THREE from "three"`
      instead of hardcoding a CDN URL in every single file. Bump the
      version here in one place if you ever want to upgrade Three.js. -->
