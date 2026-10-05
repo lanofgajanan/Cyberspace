@@ -26,12 +26,13 @@ const replay = createCameraReplay(cameraControls);
 const lifecycle = createLifecycle(({ mode, onProgress }) => {
   resetSeed(mode === "megacity" ? 4242 : 1337);
   let cityData;
+  const generationStartedAt = performance.now();
   try {
     cityData = mode === "megacity" ? generateMegacity(4242) : generateCity();
   } catch (error) {
     throw Object.assign(new Error("The city generator failed while creating geometry."), { code: "E_GENERATION_FAILED", cause: error });
   }
-  if (onProgress) onProgress(58, "Preparing render geometry");
+  if (onProgress) onProgress(45, "Preparing render geometry");
   let sceneObjects;
   try {
     const glitchCubes = mode === "megacity" ? [] : generateGlitchCubes(cityData.buildingBoxes);
@@ -39,6 +40,7 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   } catch (error) {
     throw Object.assign(new Error("The renderer failed while building city geometry."), { code: "E_SCENE_BUILD_FAILED", cause: error });
   }
+  const generationMs = performance.now() - generationStartedAt;
   document.getElementById("stats").textContent = cityData.stats;
   cameraControls.setReplayPose(null);
   return {
@@ -46,6 +48,7 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
     dispose: () => sceneObjects.dispose(),
     sceneObjects,
     cityData,
+    generationMs,
   };
 });
 
@@ -67,7 +70,17 @@ function setLoadingProgress(value, status) {
 }
 
 function nextFrame() {
-  return new Promise((resolve) => requestAnimationFrame(resolve));
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    requestAnimationFrame(finish);
+    // A throttled/background tab may not deliver a frame promptly.
+    setTimeout(finish, 120);
+  });
 }
 
 function getErrorDetails(error, fallbackCode) {
@@ -90,21 +103,23 @@ async function selectMode(mode) {
     setLoadingProgress(20, mode === "megacity" ? "Seeding megacity districts" : "Seeding legacy road network");
     await nextFrame();
     if (request !== loadRequest) return;
-    setLoadingProgress(45, "Generating city geometry");
+    setLoadingProgress(35, "Generating city geometry");
     const active = lifecycle.init({ mode, onProgress: setLoadingProgress });
-    if (!active || !active.cityData) throw Object.assign(new Error("Generator returned no city data."), { code: "E_GENERATION_EMPTY" });
-    await nextFrame();
+    if (!active || !active.cityData) {
+      throw Object.assign(new Error("Generator returned no city data."), { code: "E_GENERATION_EMPTY" });
+    }
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
     document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / vertical slice" : "legacy city";
-    document.getElementById("diagnostics").textContent = `status: ready · seed ${active.cityData.seed || "runtime"} · ${active.cityData.diagnostics ? `worker ${active.cityData.diagnostics.worker ? "ready" : "fallback"}` : "static generator"}`;
-    await nextFrame();
-    if (request !== loadRequest) return;
+    document.getElementById("diagnostics").textContent =
+      `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
-    await nextFrame();
+    // Completion is intentionally synchronous after the ready state. Waiting
+    // for another animation frame here can strand the overlay at "City ready".
     loading.hidden = true;
   } catch (error) {
+    if (request !== loadRequest) return;
     const details = getErrorDetails(error, "E_MODE_LOAD_FAILED");
     loadingError.textContent = `${details.code}: ${details.message}`;
     loadingError.hidden = false;
@@ -135,7 +150,13 @@ function animate(now) {
   lifecycle.update(dt);
   if (ui.getShowingDots() && lifecycle.active) {
     const objects = lifecycle.active.sceneObjects;
-    objects.denseDotView.visible = cameraControls.isFlying() || cameraControls.getRadius() < objects.DENSE_DOT_ZOOM_THRESHOLD;
+    const needsDense = cameraControls.isFlying() || cameraControls.getRadius() < objects.DENSE_DOT_ZOOM_THRESHOLD;
+    if (needsDense) objects.ensureDenseDotView().visible = true;
+    if (objects.denseDotView) objects.denseDotView.visible = needsDense;
+    if (objects.denseBuildMs) {
+      document.getElementById("diagnostics").textContent =
+        `status: ready · ${Math.round(objects.denseBuildMs)}ms dense dots`;
+    }
   }
   renderer.render(scene, camera);
 }

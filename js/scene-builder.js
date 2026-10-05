@@ -132,29 +132,41 @@ export function buildScene(scene, cityData, glitchCubes) {
   sparseDotView.visible = false;
   scene.add(sparseDotView);
 
-  const densePositions = [];
-  const denseColors = [];
-  subdivideToPoints(mergedPositions, mergedColors, 0.35, densePositions, denseColors);
-  generateFillPoints(cityData.buildingBoxes, cityData.CITY_RADIUS, densePositions, denseColors);
-  const denseStreakData = buildStreakVertexData(densePositions, denseColors, 0.2, 1.7);
-  const denseDotView = makeLineSegments(denseStreakData.verts, denseStreakData.vcolors, streakMat);
-  denseDotView.visible = false;
-  scene.add(denseDotView);
+  let denseDotView = null;
+  let denseBuildMs = 0;
+  function ensureDenseDotView() {
+    if (denseDotView) return denseDotView;
+    const startedAt = performance.now();
+    const densePositions = [];
+    const denseColors = [];
+    subdivideToPoints(mergedPositions, mergedColors, 0.35, densePositions, denseColors);
+    generateFillPoints(cityData.buildingBoxes, cityData.CITY_RADIUS, densePositions, denseColors);
+    const denseStreakData = buildStreakVertexData(densePositions, denseColors, 0.2, 1.7);
+    denseDotView = makeLineSegments(denseStreakData.verts, denseStreakData.vcolors, streakMat);
+    denseDotView.visible = false;
+    scene.add(denseDotView);
+    denseBuildMs = performance.now() - startedAt;
+    return denseDotView;
+  }
 
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
   return {
     scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine,
-    sparseDotView, denseDotView, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
+    sparseDotView, get denseDotView() { return denseDotView; }, ensureDenseDotView,
+    get denseBuildMs() { return denseBuildMs; }, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
     update: (dt) => { if (trafficLine) trafficLine.userData.tick(dt); },
     dispose: () => {
-      scene.remove(buildingMesh, glitchMesh, lineView, sparseDotView, denseDotView);
+      scene.remove(buildingMesh, glitchMesh, lineView, sparseDotView);
+      if (denseDotView) scene.remove(denseDotView);
       if (trafficLine) scene.remove(trafficLine);
       if (blackwallLine) scene.remove(blackwallLine);
-      [buildingMesh, glitchMesh, lineView, sparseDotView, denseDotView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
+      [buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose()); else obj.material.dispose();
       });
+      [sparseDotView, denseDotView].filter(Boolean).forEach((obj) => obj.geometry.dispose());
+      streakMat.dispose();
     },
   };
 }
