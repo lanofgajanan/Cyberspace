@@ -13,11 +13,13 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
   let showingDots = false;
   const viewBtn = document.getElementById("view-toggle");
   viewBtn.addEventListener("click", () => {
-    const { lineView, sparseDotView, denseDotView, DENSE_DOT_ZOOM_THRESHOLD } = getObjects();
+    const { lineView, sparseDotView, ensureDenseDotView, DENSE_DOT_ZOOM_THRESHOLD } = getObjects();
     showingDots = !showingDots;
     lineView.visible = !showingDots;
     sparseDotView.visible = showingDots;
-    denseDotView.visible = showingDots && cameraControls.getRadius() < DENSE_DOT_ZOOM_THRESHOLD;
+    if (showingDots && cameraControls.getRadius() < DENSE_DOT_ZOOM_THRESHOLD) {
+      ensureDenseDotView().visible = true;
+    }
     viewBtn.textContent = showingDots ? "Edge view" : "Dot view";
   });
 
@@ -70,7 +72,12 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
   document.getElementById("replay-import").addEventListener("click", () => replayFile.click());
   replayFile.addEventListener("change", async () => {
     const file = replayFile.files && replayFile.files[0]; if (!file) return;
-    try { replay.importJSON(await file.text()); } catch (error) { document.getElementById("stats").textContent = `replay error: ${error.message}`; }
+    try {
+      replay.importJSON(await file.text());
+    } catch (error) {
+      document.getElementById("stats").textContent = `replay error [E_REPLAY_IMPORT_INVALID]: ${error.message}`;
+      document.getElementById("diagnostics").textContent = "status: replay import rejected";
+    }
     replayFile.value = "";
   });
 

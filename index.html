@@ -12,10 +12,21 @@
   <div id="hud">
     Net // <span id="mode-status">legacy city</span><br/>
     <span class="dim" id="stats">generating…</span><br/>
+    <span class="dim" id="diagnostics">status: starting</span><br/>
     <span class="dim">drag orbit · scroll/pinch zoom · WASD pan</span><br/>
     <span class="dim">Fly mode: click canvas to lock mouse · look to turn · WASD+Space/Shift move · Esc unlocks · Tab hides this UI</span>
   </div>
-  <div id="loading">INITIALIZING CITY SIMULATION…</div>
+  <div id="loading" role="status" aria-live="polite">
+    <div class="loading-card">
+      <div class="loading-title">INITIALIZING CITY SIMULATION…</div>
+      <div class="progress-track" role="progressbar" aria-label="City generation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="loading-progress"></div>
+      </div>
+      <div id="loading-status">Preparing renderer</div>
+      <div id="loading-error" role="alert" hidden></div>
+      <button id="loading-retry" class="ctl-btn" type="button" hidden>Retry generation</button>
+    </div>
+  </div>
   <div id="mode-panel">
     <label for="mode-select">World profile</label>
     <select id="mode-select">
