@@ -159,10 +159,21 @@ export function buildScene(scene, cityData, glitchCubes) {
       new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, fog: true, opacity: 1 })
     )
     : null;
+  const blackwallGroundMesh = cityData.blackwallRadius
+    ? new THREE.Mesh(
+      new THREE.CylinderGeometry(cityData.blackwallRadius, cityData.blackwallRadius, 0.2, 72),
+      new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, fog: false })
+    )
+    : null;
   if (blackwallMesh) {
     blackwallMesh.position.y = (cityData.blackwallHeight || 62) / 2 + 2;
     blackwallMesh.frustumCulled = false;
     scene.add(blackwallMesh);
+  }
+  if (blackwallGroundMesh) {
+    blackwallGroundMesh.position.y = -0.2;
+    blackwallGroundMesh.frustumCulled = false;
+    scene.add(blackwallGroundMesh);
   }
 
   // Two-tier dot/streak system: a coarse "sparse" layer is always shown
@@ -201,7 +212,7 @@ export function buildScene(scene, cityData, glitchCubes) {
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
   return {
-    scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine, blackwallMesh,
+    scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine, blackwallMesh, blackwallGroundMesh,
     terrainMesh, heatmapView, slopeView,
     sparseDotView, get denseDotView() { return denseDotView; }, ensureDenseDotView,
     get denseBuildMs() { return denseBuildMs; }, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
@@ -213,7 +224,8 @@ export function buildScene(scene, cityData, glitchCubes) {
       if (trafficLine) scene.remove(trafficLine);
       if (blackwallLine) scene.remove(blackwallLine);
       if (blackwallMesh) scene.remove(blackwallMesh);
-      [buildingMesh, glitchMesh, lineView, heatmapView, slopeView, trafficLine, blackwallLine, blackwallMesh].filter(Boolean).forEach((obj) => {
+      if (blackwallGroundMesh) scene.remove(blackwallGroundMesh);
+      [buildingMesh, glitchMesh, lineView, heatmapView, slopeView, trafficLine, blackwallLine, blackwallMesh, blackwallGroundMesh].filter(Boolean).forEach((obj) => {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose()); else obj.material.dispose();
       });
