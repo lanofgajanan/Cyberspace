@@ -34,18 +34,23 @@ the import map in `index.html` from a CDN.
 ## World modes and replay
 
 The **World profile** selector keeps the original procedural city available
-as **Legacy city**. The former megacity vertical-slice prototype is retired
-from the runtime until its replacement is implemented; selecting the
-**Megacity profile** remains safe and loads the planned city instead. Both
-modes use the same
+as **Legacy city** and adds **Megacity vertical slice**, a deterministic
+seeded ten-district scene with terraced shelves, distinct
+market/corporate/residential/industrial/Pacifica/Dogtown/tower silhouettes,
+dense lots and roads, facade windows, decks, connectors, animated traffic
+shader lines, and the red Blackwall boundary. The megacity targets roughly
+5,000-10,000 instanced structures while keeping line layers merged and dense
+dots lazy. Both modes use the same
 `init(ctx)`, `update(dt)`, and `dispose()` lifecycle so switching modes
 explicitly releases the previous GPU resources.
 
 Replay controls capture camera waypoints, interpolate positions with
 per-segment Hermite timing and orientations with quaternion slerp, and
 support validated JSON import/export. During playback replay owns the camera;
-stopping restores normal orbit/fly controls. The HUD also reports live FPS,
-renderer draw calls, road segment count, and generation time.
+stopping restores normal orbit/fly controls. The megacity generator exposes
+diagnostics for chunk/worker readiness and seeded heightfield state. The HUD
+also reports live FPS, renderer draw calls, road segment count, and generation
+time.
 Mode changes show staged generation progress and keep the selected profile
 recoverable through a retry action if generation or render setup fails.
 User-facing failures include stable codes such as `E_GENERATION_FAILED`,
@@ -80,6 +85,7 @@ js/
   ui.js                              Wires HUD buttons + settings sliders
   main.js                            Entry point — ties everything together
   lifecycle.js                       Explicit init/update/dispose mode shell
+  megacity-generator.js              Seeded terrace + vertical-slice generator
   camera-replay.js                   Waypoint capture, validation and playback
 ```
 

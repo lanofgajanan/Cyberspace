@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { resetSeed } from "./rng.js";
 import { generateCity } from "./city-generator.js";
+import { generateMegacity } from "./megacity-generator.js";
 import { generateGlitchCubes } from "./glitch-cubes.js";
 import { buildScene } from "./scene-builder.js";
 import { createCameraControls } from "./camera-controls.js";
@@ -27,9 +28,7 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   let cityData;
   const generationStartedAt = performance.now();
   try {
-    // The prototype megacity generator is retired until its replacement is
-    // implemented. Keep the profile selector and planned city operational.
-    cityData = generateCity();
+    cityData = mode === "megacity" ? generateMegacity(4242) : generateCity();
   } catch (error) {
     throw Object.assign(new Error("The city generator failed while creating geometry."), { code: "E_GENERATION_FAILED", cause: error });
   }
@@ -104,7 +103,7 @@ async function selectMode(mode) {
   await nextFrame();
   if (request !== loadRequest) return;
   try {
-    setLoadingProgress(20, mode === "megacity" ? "Loading planned city profile" : "Seeding legacy road network");
+    setLoadingProgress(20, mode === "megacity" ? "Seeding megacity districts" : "Seeding legacy road network");
     await nextFrame();
     if (request !== loadRequest) return;
     setLoadingProgress(35, "Generating city geometry");
@@ -115,11 +114,9 @@ async function selectMode(mode) {
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
-    document.getElementById("mode-status").textContent = mode === "megacity"
-      ? "planned city / megacity profile retired"
-      : "legacy city";
+    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
     document.getElementById("diagnostics").textContent =
-      `status: ready · seed ${active.cityData.seed || "runtime"}`;
+      `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
     // Complete synchronously after the ready state; waiting for another frame
     // can strand the overlay at "City ready" in throttled pages.
