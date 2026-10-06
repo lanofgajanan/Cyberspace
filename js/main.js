@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { resetSeed } from "./rng.js";
 import { generateCity } from "./city-generator.js";
-import { generateMegacity } from "./megacity-generator.js";
 import { generateGlitchCubes } from "./glitch-cubes.js";
 import { buildScene } from "./scene-builder.js";
 import { createCameraControls } from "./camera-controls.js";
@@ -28,7 +27,9 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   let cityData;
   const generationStartedAt = performance.now();
   try {
-    cityData = mode === "megacity" ? generateMegacity(4242) : generateCity();
+    // The prototype megacity generator is retired until its replacement is
+    // implemented. Keep the profile selector and planned city operational.
+    cityData = generateCity();
   } catch (error) {
     throw Object.assign(new Error("The city generator failed while creating geometry."), { code: "E_GENERATION_FAILED", cause: error });
   }
@@ -42,6 +43,8 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   }
   const generationMs = performance.now() - generationStartedAt;
   document.getElementById("stats").textContent = cityData.stats;
+  document.getElementById("runtime-stats").textContent =
+    `FPS: -- · draw calls: -- · segments: ${cityData.roadList ? cityData.roadList.length : 0} · generation: ${Math.round(generationMs)}ms`;
   cameraControls.setReplayPose(null);
   return {
     update: (dt) => sceneObjects.update(dt),
@@ -101,7 +104,7 @@ async function selectMode(mode) {
   await nextFrame();
   if (request !== loadRequest) return;
   try {
-    setLoadingProgress(20, mode === "megacity" ? "Seeding megacity districts" : "Seeding legacy road network");
+    setLoadingProgress(20, mode === "megacity" ? "Loading planned city profile" : "Seeding legacy road network");
     await nextFrame();
     if (request !== loadRequest) return;
     setLoadingProgress(35, "Generating city geometry");
@@ -112,9 +115,11 @@ async function selectMode(mode) {
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
-    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
+    document.getElementById("mode-status").textContent = mode === "megacity"
+      ? "planned city / megacity profile retired"
+      : "legacy city";
     document.getElementById("diagnostics").textContent =
-      `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
+      `status: ready · seed ${active.cityData.seed || "runtime"}`;
     setLoadingProgress(100, "City ready");
     // Complete synchronously after the ready state; waiting for another frame
     // can strand the overlay at "City ready" in throttled pages.
@@ -144,6 +149,8 @@ loadingRetry.addEventListener("click", () => selectMode(selectedMode));
 const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, cameraControls, replay);
 
 let last = performance.now();
+let statsLastAt = last;
+let statsFrameCount = 0;
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -161,6 +168,17 @@ function animate(now) {
     }
   }
   renderer.render(scene, camera);
+  statsFrameCount += 1;
+  if (now - statsLastAt >= 500) {
+    const active = lifecycle.active;
+    const fps = statsFrameCount * 1000 / (now - statsLastAt);
+    const segments = active && active.cityData && active.cityData.roadList ? active.cityData.roadList.length : 0;
+    const generation = active ? `${Math.round(active.generationMs)}ms` : "--";
+    document.getElementById("runtime-stats").textContent =
+      `FPS: ${Math.round(fps)} · draw calls: ${renderer.info.render.calls} · segments: ${segments} · generation: ${generation}`;
+    statsFrameCount = 0;
+    statsLastAt = now;
+  }
 }
 requestAnimationFrame(animate);
 

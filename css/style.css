@@ -10,10 +10,10 @@
   #hud {
     position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px;
     color: #4fd1ff; font-size: 12px; letter-spacing: 0.08em; line-height: 1.6;
-    text-transform: uppercase; opacity: 0.85; pointer-events: none;
+    text-transform: uppercase; opacity: 1; pointer-events: none;
     text-shadow: 0 0 6px rgba(79, 209, 255, 0.6);
   }
-  #hud .dim { color: #2a6a80; }
+  #hud .dim { color: #8fb9c9; text-shadow: 0 0 5px rgba(143, 185, 201, 0.35); }
   #loading {
     position: fixed; inset: 0; display: grid; place-items: center;
     color: #4fd1ff; letter-spacing: 0.12em; background: #050b16; z-index: 4;
@@ -80,6 +80,36 @@
     max-width: calc(100vw - 32px);
   }
 
+  #replay-panel {
+    position: fixed;
+    right: 16px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    color: #4fd1ff;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    z-index: 2;
+  }
+  #replay-panel > summary {
+    list-style: none;
+    display: block;
+  }
+  #replay-panel > summary::-webkit-details-marker { display: none; }
+  #replay-panel[open] > summary { background: rgba(79, 209, 255, 0.08); }
+  .replay-controls {
+    position: absolute;
+    right: 0;
+    bottom: 84px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 12px;
+    border: 1px solid #2a6a80;
+    background: rgba(5, 11, 22, 0.94);
+  }
+
   #settings-panel {
     position: fixed;
     bottom: calc(68px + env(safe-area-inset-bottom, 0px));
@@ -109,4 +139,41 @@
   #settings-panel input[type="range"] {
     width: 100%;
     accent-color: #4fd1ff;
+  }
+
+  @media (max-width: 560px) {
+    #hud {
+      top: calc(10px + env(safe-area-inset-top, 0px));
+      left: 10px;
+      right: 10px;
+      font-size: 10px;
+      line-height: 1.45;
+    }
+    #mode-panel {
+      top: calc(10px + env(safe-area-inset-top, 0px));
+      right: 10px;
+      font-size: 9px;
+    }
+    #mode-panel label { display: none; }
+    #mode-panel select { margin-left: 0; padding: 5px; max-width: 170px; }
+    #btn-row {
+      left: 10px;
+      right: 10px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      max-width: none;
+      gap: 6px;
+    }
+    #btn-row .ctl-btn { padding: 7px 9px; font-size: 10px; }
+    #replay-panel {
+      right: 10px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+    .replay-controls {
+      right: 0;
+      bottom: 84px;
+      width: min(300px, calc(100vw - 20px));
+      gap: 6px;
+      padding: 8px;
+    }
+    .replay-controls .ctl-btn { padding: 7px 9px; font-size: 10px; }
   }
