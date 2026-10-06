@@ -45,6 +45,21 @@ function buildGlitchMesh(glitchCubes) {
   return mesh;
 }
 
+function buildTerrainMesh(terrain) {
+  if (!terrain) return { meshes: [], material: null };
+  const material = new THREE.MeshBasicMaterial({ color: 0x000000, fog: true, side: THREE.DoubleSide });
+  const meshes = terrain.chunks.map((chunk) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(chunk.positions, 3));
+    geometry.setIndex(chunk.indices);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    return mesh;
+  });
+  return { meshes, material };
+}
+
 // Merges the 5 separate line layers (edges/windows/accents/ground/
 // centerline) into ONE draw call. Each layer previously had its own
 // opacity, blended by the GPU every frame — since everything here only
@@ -67,6 +82,12 @@ function buildMergedLineData(cityData) {
   appendLayer(cityData.accentVerts, ACCENT_COLOR, 1);
   appendLayer(cityData.groundVerts, GROUND_COLOR, 0.8);
   appendLayer(cityData.centerlineVerts, GROUND_COLOR, 0.45);
+  if (cityData.terrainEdgeVerts) {
+    for (let i = 0; i < cityData.terrainEdgeVerts.length; i += 3) {
+      positions.push(cityData.terrainEdgeVerts[i], cityData.terrainEdgeVerts[i + 1], cityData.terrainEdgeVerts[i + 2]);
+      colors.push(cityData.terrainEdgeColors[i], cityData.terrainEdgeColors[i + 1], cityData.terrainEdgeColors[i + 2]);
+    }
+  }
   (cityData.districtAccentLayers || []).forEach((layer) => appendLayer(layer.verts, layer.color, 0.92));
   return { positions, colors };
 }
@@ -106,10 +127,26 @@ export function buildScene(scene, cityData, glitchCubes) {
   const glitchMesh = buildGlitchMesh(glitchCubes);
   scene.add(glitchMesh);
 
+  const terrainMesh = buildTerrainMesh(cityData.terrain);
+  terrainMesh.meshes.forEach((mesh) => scene.add(mesh));
+
   const { positions: mergedPositions, colors: mergedColors } = buildMergedLineData(cityData);
   const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, fog: true });
   const lineView = makeLineSegments(mergedPositions, mergedColors, lineMat);
   scene.add(lineView);
+  const heatmapView = makeLineSegments(
+    cityData.terrainHeatmapVerts || [],
+    cityData.terrainHeatmapColors || [],
+    new THREE.LineBasicMaterial({ vertexColors: true, fog: true })
+  );
+  const slopeView = makeLineSegments(
+    cityData.terrainSlopeVerts || [],
+    cityData.terrainSlopeColors || [],
+    new THREE.LineBasicMaterial({ vertexColors: true, fog: true })
+  );
+  heatmapView.visible = false;
+  slopeView.visible = false;
+  scene.add(heatmapView, slopeView);
   const trafficLine = cityData.trafficVerts ? makeTrafficLine(cityData.trafficVerts) : null;
   if (trafficLine) scene.add(trafficLine);
   const blackwallLine = cityData.blackwallVerts
@@ -153,19 +190,22 @@ export function buildScene(scene, cityData, glitchCubes) {
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
   return {
-    scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine,
+    scene, buildingMesh, glitchMesh, lineView, terrainMesh, heatmapView, slopeView, trafficLine, blackwallLine,
     sparseDotView, get denseDotView() { return denseDotView; }, ensureDenseDotView,
     get denseBuildMs() { return denseBuildMs; }, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
     update: (dt) => { if (trafficLine) trafficLine.userData.tick(dt); },
     dispose: () => {
-      scene.remove(buildingMesh, glitchMesh, lineView, sparseDotView);
+      scene.remove(buildingMesh, glitchMesh, lineView, heatmapView, slopeView, sparseDotView);
+      terrainMesh.meshes.forEach((mesh) => scene.remove(mesh));
       if (denseDotView) scene.remove(denseDotView);
       if (trafficLine) scene.remove(trafficLine);
       if (blackwallLine) scene.remove(blackwallLine);
-      [buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
+      [buildingMesh, glitchMesh, lineView, heatmapView, slopeView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose()); else obj.material.dispose();
       });
+      terrainMesh.meshes.forEach((mesh) => mesh.geometry.dispose());
+      if (terrainMesh.material) terrainMesh.material.dispose();
       [sparseDotView, denseDotView].filter(Boolean).forEach((obj) => obj.geometry.dispose());
       streakMat.dispose();
     },

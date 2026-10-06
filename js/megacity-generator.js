@@ -1,5 +1,6 @@
 import { resetSeed, nextRandom, randRange } from "./rng.js";
 import { pushSegment, pushLoop } from "./geometry.js";
+import { createTerrain } from "./terrain.js";
 
 // This module deliberately produces renderer-neutral data. scene-builder.js
 // turns the solids into one InstancedMesh and the line arrays into merged
@@ -23,16 +24,13 @@ const DISTRICT_RADIUS = 215;
 
 export function generateMegacity(seed = 4242) {
   resetSeed(seed);
+  const terrain = createTerrain(seed);
   const buildingBoxes = [], edgeVerts = [], windowVerts = [], accentVerts = [];
   const groundVerts = [], centerlineVerts = [], trafficVerts = [], blackwallVerts = [];
   const districts = [], shelves = [], roads = [];
   const districtCenters = [];
 
-  function terrainY(x, z) {
-    const r = Math.hypot(x, z);
-    const terraces = Math.max(0, 5 - Math.floor(r / 75));
-    return terraces * 4 + Math.sin(x * 0.035) * 1.2 + Math.cos(z * 0.03) * 1.1;
-  }
+  const terrainY = terrain.groundHeightAt;
   function line(arr, a, b) { pushSegment(arr, a[0], a[1], a[2], b[0], b[1], b[2]); }
   function boxCorners(b) {
     const out = [];
@@ -132,17 +130,8 @@ export function generateMegacity(seed = 4242) {
     }
   }
 
-  // Terraced terrain and a few contour seams make elevation readable even
-  // when the renderer is in solid/line mode.
-  for (let level = 0; level < 6; level++) {
-    const radius = CITY_RADIUS - level * 58, y = level * 4;
-    shelves.push({ level, radius, y });
-    const pts = [];
-    for (let i = 0; i < 64; i++) {
-      const a = i / 64 * TAU, rr = radius + Math.sin(a * 5 + level) * 4;
-      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
-    }
-    pushLoop(groundVerts, pts, y);
+  for (let level = 0; level <= terrain.diagnostics.terraceLevels; level++) {
+    shelves.push({ level, y: level * terrain.H });
   }
   // Arterials, district cross streets, and a transit ring. The central
   // district owns the inner 125m, so the citywide spokes stop at its
@@ -307,7 +296,7 @@ export function generateMegacity(seed = 4242) {
   // Elevated decks and switchback connectors tie the shelves together.
   const connector = [];
   for (let i = 0; i < 11; i++) {
-    const x = -315 + i * 63, z = -65 + (i % 2) * 56, y = 5 + i * 2.2;
+    const x = -315 + i * 63, z = -65 + (i % 2) * 56, y = terrainY(x, z) + 5 + i * 0.4;
     connector.push([x, y, z]);
     if (i) line(groundVerts, connector[i - 1], [x, y, z]);
     line(accentVerts, [x - 10, y + 0.4, z], [x + 10, y + 0.4, z]);
@@ -325,14 +314,21 @@ export function generateMegacity(seed = 4242) {
   }
   return {
     buildingBoxes, edgeVerts, windowVerts, accentVerts, groundVerts, centerlineVerts, trafficVerts, blackwallVerts,
-    districts, shelves, connector, roads, CITY_RADIUS, seed, profiles: DISTRICT_PROFILES,
-    stats: `${districts.length} districts · ${buildingBoxes.length} structures · ${roads.length} road segments · ${shelves.length} terraces · seeded ${seed}`,
+    terrain, districts, shelves, connector, roads, CITY_RADIUS, seed, profiles: DISTRICT_PROFILES,
+    terrainEdgeVerts: terrain.edgeVerts,
+    terrainEdgeColors: terrain.edgeColors,
+    terrainHeatmapVerts: terrain.heatmapVerts,
+    terrainHeatmapColors: terrain.heatmapColors,
+    terrainSlopeVerts: terrain.slopeVerts,
+    terrainSlopeColors: terrain.slopeColors,
+    stats: `${districts.length} districts · ${buildingBoxes.length} structures · ${roads.length} road segments · ${terrain.diagnostics.terraceLevels} terrain levels · seeded ${seed}`,
     diagnostics: {
-      chunks: 1,
+      chunks: terrain.diagnostics.chunkCount,
       worker: typeof Worker !== "undefined",
       heightfield: "terraced",
       blackwall: true,
       density: buildingBoxes.length,
+      terrain: terrain.diagnostics,
       cityCenter: {
         roads: cityCenter.roads,
         blocks: cityCenter.blocks.length,

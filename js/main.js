@@ -42,6 +42,13 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   }
   const generationMs = performance.now() - generationStartedAt;
   document.getElementById("stats").textContent = cityData.stats;
+  if (mode === "megacity" && cityData.diagnostics && cityData.diagnostics.terrain) {
+    const terrainCheck = cityData.diagnostics.terrain;
+    const selfCheck = `PHASE 1 TERRAIN · levels ${terrainCheck.terraceLevels} · components ${terrainCheck.components} · max slope ${terrainCheck.maxSlope.toFixed(3)} · chunks ${terrainCheck.chunkCount} · camera-ground: unavailable (free camera)`;
+    console.info(selfCheck, terrainCheck);
+    document.getElementById("stats").textContent = `${cityData.stats} · ${selfCheck}`;
+    document.getElementById("diagnostics").textContent = "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)";
+  }
   document.getElementById("runtime-stats").textContent =
     `FPS: -- · draw calls: -- · segments: ${cityData.roadList ? cityData.roadList.length : 0} · generation: ${Math.round(generationMs)}ms`;
   cameraControls.setReplayPose(null);
@@ -116,7 +123,9 @@ async function selectMode(mode) {
     cameraControls.clearReplayPose();
     document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
     document.getElementById("diagnostics").textContent =
-      `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
+      mode === "megacity" && active.cityData.diagnostics && active.cityData.diagnostics.terrain
+        ? "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)"
+        : `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
     // Complete synchronously after the ready state; waiting for another frame
     // can strand the overlay at "City ready" in throttled pages.
