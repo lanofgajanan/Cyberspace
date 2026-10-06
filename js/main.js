@@ -11,7 +11,7 @@ import { createLifecycle } from "./lifecycle.js";
 
 const canvasWrap = document.getElementById("canvas-wrap");
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 2200);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 4200);
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true });

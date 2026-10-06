@@ -119,7 +119,7 @@ function makeTrafficLine(verts) {
 // at once) = up to 4, regardless of city size.
 export function buildScene(scene, cityData, glitchCubes) {
   scene.background = new THREE.Color(BG_COLOR);
-  scene.fog = new THREE.Fog(BG_COLOR, 260, 1500);
+  scene.fog = new THREE.Fog(BG_COLOR, 260, 3600);
 
   const buildingMesh = buildBuildingMesh(cityData.buildingBoxes);
   scene.add(buildingMesh);
@@ -153,6 +153,17 @@ export function buildScene(scene, cityData, glitchCubes) {
     ? makeLineSegments(cityData.blackwallVerts, cityData.blackwallVerts.map((_, i) => i % 3 === 0 ? 1 : 0.08), new THREE.LineBasicMaterial({ color: 0xff2020, fog: true }))
     : null;
   if (blackwallLine) scene.add(blackwallLine);
+  const blackwallMesh = cityData.blackwallRadius
+    ? new THREE.Mesh(
+      new THREE.CylinderGeometry(cityData.blackwallRadius, cityData.blackwallRadius, cityData.blackwallHeight || 62, 72, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, fog: true, opacity: 1 })
+    )
+    : null;
+  if (blackwallMesh) {
+    blackwallMesh.position.y = (cityData.blackwallHeight || 62) / 2 + 2;
+    blackwallMesh.frustumCulled = false;
+    scene.add(blackwallMesh);
+  }
 
   // Two-tier dot/streak system: a coarse "sparse" layer is always shown
   // in dot mode (reads as a light outline from any distance — this is
@@ -190,7 +201,8 @@ export function buildScene(scene, cityData, glitchCubes) {
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
   return {
-    scene, buildingMesh, glitchMesh, lineView, terrainMesh, heatmapView, slopeView, trafficLine, blackwallLine,
+    scene, buildingMesh, glitchMesh, lineView, trafficLine, blackwallLine, blackwallMesh,
+    terrainMesh, heatmapView, slopeView,
     sparseDotView, get denseDotView() { return denseDotView; }, ensureDenseDotView,
     get denseBuildMs() { return denseBuildMs; }, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
     update: (dt) => { if (trafficLine) trafficLine.userData.tick(dt); },
@@ -200,7 +212,8 @@ export function buildScene(scene, cityData, glitchCubes) {
       if (denseDotView) scene.remove(denseDotView);
       if (trafficLine) scene.remove(trafficLine);
       if (blackwallLine) scene.remove(blackwallLine);
-      [buildingMesh, glitchMesh, lineView, heatmapView, slopeView, trafficLine, blackwallLine].filter(Boolean).forEach((obj) => {
+      if (blackwallMesh) scene.remove(blackwallMesh);
+      [buildingMesh, glitchMesh, lineView, heatmapView, slopeView, trafficLine, blackwallLine, blackwallMesh].filter(Boolean).forEach((obj) => {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose()); else obj.material.dispose();
       });

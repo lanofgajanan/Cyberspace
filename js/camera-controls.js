@@ -70,7 +70,7 @@ export function createCameraControls(camera, domElement, options) {
     e.preventDefault();
     if (flying) return;
     targetRadius *= 1 + e.deltaY * 0.0012;
-    targetRadius = Math.max(8, Math.min(900, targetRadius));
+    targetRadius = Math.max(8, Math.min(3600, targetRadius));
     lastInputTime = performance.now();
   }, { passive: false });
 
@@ -82,7 +82,7 @@ export function createCameraControls(camera, domElement, options) {
     if (e.touches.length === 2) {
       const d = touchDist(e);
       targetRadius *= pinchDist / d;
-      targetRadius = Math.max(8, Math.min(900, targetRadius));
+      targetRadius = Math.max(8, Math.min(3600, targetRadius));
       pinchDist = d;
       lastInputTime = performance.now();
     } else onDragMove(e.touches[0].clientX, e.touches[0].clientY);
