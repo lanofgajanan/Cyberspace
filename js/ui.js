@@ -37,6 +37,19 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
     flyBtn.textContent = cameraControls.isFlying() ? "Exit fly mode" : "Fly mode";
   });
 
+  function wireTerrainToggle(id, viewKey, label) {
+    const button = document.getElementById(id);
+    button.addEventListener("click", () => {
+      const objects = getObjects();
+      const view = objects[viewKey];
+      if (!view) return;
+      view.visible = !view.visible;
+      button.textContent = view.visible ? `Hide ${label}` : label;
+    });
+  }
+  wireTerrainToggle("terrain-heatmap-toggle", "heatmapView", "Terrain heatmap");
+  wireTerrainToggle("terrain-slope-toggle", "slopeView", "Terrain slope");
+
   const settingsBtn = document.getElementById("settings-toggle");
   const settingsPanel = document.getElementById("settings-panel");
   settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("open"));

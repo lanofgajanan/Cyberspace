@@ -11,7 +11,7 @@ import { createLifecycle } from "./lifecycle.js";
 
 const canvasWrap = document.getElementById("canvas-wrap");
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 1800);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 4200);
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -21,7 +21,7 @@ try {
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 canvasWrap.appendChild(renderer.domElement);
-const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 10, radius: 330, azimuth: 0.6, polar: 1.05, panLimit: 330 });
+const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 18, radius: 520, azimuth: 0.6, polar: 1.05, panLimit: 430 });
 const replay = createCameraReplay(cameraControls);
 const lifecycle = createLifecycle(({ mode, onProgress }) => {
   resetSeed(mode === "megacity" ? 4242 : 1337);
@@ -42,6 +42,15 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
   }
   const generationMs = performance.now() - generationStartedAt;
   document.getElementById("stats").textContent = cityData.stats;
+  if (mode === "megacity" && cityData.diagnostics && cityData.diagnostics.terrain) {
+    const terrainCheck = cityData.diagnostics.terrain;
+    const selfCheck = `PHASE 1 TERRAIN · levels ${terrainCheck.terraceLevels} · components ${terrainCheck.components} · max slope ${terrainCheck.maxSlope.toFixed(3)} · chunks ${terrainCheck.chunkCount} · camera-ground: unavailable (free camera)`;
+    console.info(selfCheck, terrainCheck);
+    document.getElementById("stats").textContent = `${cityData.stats} · ${selfCheck}`;
+    document.getElementById("diagnostics").textContent = "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)";
+  }
+  document.getElementById("runtime-stats").textContent =
+    `FPS: -- · draw calls: -- · segments: ${cityData.roadList ? cityData.roadList.length : 0} · generation: ${Math.round(generationMs)}ms`;
   cameraControls.setReplayPose(null);
   return {
     update: (dt) => sceneObjects.update(dt),
@@ -112,9 +121,11 @@ async function selectMode(mode) {
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
-    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / vertical slice" : "legacy city";
+    document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
     document.getElementById("diagnostics").textContent =
-      `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
+      mode === "megacity" && active.cityData.diagnostics && active.cityData.diagnostics.terrain
+        ? "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)"
+        : `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
     setLoadingProgress(100, "City ready");
     // Complete synchronously after the ready state; waiting for another frame
     // can strand the overlay at "City ready" in throttled pages.
@@ -144,6 +155,8 @@ loadingRetry.addEventListener("click", () => selectMode(selectedMode));
 const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, cameraControls, replay);
 
 let last = performance.now();
+let statsLastAt = last;
+let statsFrameCount = 0;
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -161,6 +174,17 @@ function animate(now) {
     }
   }
   renderer.render(scene, camera);
+  statsFrameCount += 1;
+  if (now - statsLastAt >= 500) {
+    const active = lifecycle.active;
+    const fps = statsFrameCount * 1000 / (now - statsLastAt);
+    const segments = active && active.cityData && active.cityData.roadList ? active.cityData.roadList.length : 0;
+    const generation = active ? `${Math.round(active.generationMs)}ms` : "--";
+    document.getElementById("runtime-stats").textContent =
+      `FPS: ${Math.round(fps)} · draw calls: ${renderer.info.render.calls} · segments: ${segments} · generation: ${generation}`;
+    statsFrameCount = 0;
+    statsLastAt = now;
+  }
 }
 requestAnimationFrame(animate);
 

@@ -22,7 +22,7 @@ export function createCameraControls(camera, domElement, options) {
 
   let isDragging = false, lastPointerX = 0, lastPointerY = 0, pinchDist = 0;
   let lastInputTime = 0;
-  const keysDown = {};
+  const keysDown = Object.create(null);
   const panVelocity = { x: 0, z: 0 };
   let panSpeedScale = 1.0;
   let driftEnabled = false;
@@ -70,7 +70,7 @@ export function createCameraControls(camera, domElement, options) {
     e.preventDefault();
     if (flying) return;
     targetRadius *= 1 + e.deltaY * 0.0012;
-    targetRadius = Math.max(8, Math.min(900, targetRadius));
+    targetRadius = Math.max(8, Math.min(3600, targetRadius));
     lastInputTime = performance.now();
   }, { passive: false });
 
@@ -82,18 +82,27 @@ export function createCameraControls(camera, domElement, options) {
     if (e.touches.length === 2) {
       const d = touchDist(e);
       targetRadius *= pinchDist / d;
-      targetRadius = Math.max(8, Math.min(900, targetRadius));
+      targetRadius = Math.max(8, Math.min(3600, targetRadius));
       pinchDist = d;
       lastInputTime = performance.now();
     } else onDragMove(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: true });
   window.addEventListener("touchend", () => { isDragging = false; });
 
+  function clearKeys() {
+    Object.keys(keysDown).forEach((code) => { keysDown[code] = false; });
+    panVelocity.x = 0;
+    panVelocity.z = 0;
+  }
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space") e.preventDefault(); // stop page scroll — Space is "fly up"
-    keysDown[e.key.toLowerCase()] = true;
+    keysDown[e.code] = true;
   });
-  window.addEventListener("keyup", (e) => { keysDown[e.key.toLowerCase()] = false; });
+  window.addEventListener("keyup", (e) => { keysDown[e.code] = false; });
+  window.addEventListener("blur", clearKeys);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) clearKeys(); });
+  document.addEventListener("pointerlockchange", clearKeys);
+  document.addEventListener("pointerlockerror", clearKeys);
 
   // Click the canvas to lock the pointer, but only while in fly mode —
   // a normal click (e.g. starting an orbit drag) shouldn't try to lock it.
@@ -115,9 +124,9 @@ export function createCameraControls(camera, domElement, options) {
   }
   function tickFly() {
     const fwd = flyForward(), right = flyRight();
-    const f = (keysDown.w || keysDown.arrowup ? 1 : 0) - (keysDown.s || keysDown.arrowdown ? 1 : 0);
-    const r = (keysDown.d || keysDown.arrowright ? 1 : 0) - (keysDown.a || keysDown.arrowleft ? 1 : 0);
-    const u = (keysDown[" "] ? 1 : 0) - (keysDown.control ? 1 : 0);
+    const f = (keysDown.KeyW || keysDown.ArrowUp ? 1 : 0) - (keysDown.KeyS || keysDown.ArrowDown ? 1 : 0);
+    const r = (keysDown.KeyD || keysDown.ArrowRight ? 1 : 0) - (keysDown.KeyA || keysDown.ArrowLeft ? 1 : 0);
+    const u = (keysDown.Space ? 1 : 0) - (keysDown.Control ? 1 : 0);
     const sp = FLY_SPEED_BASE * flySpeedScale;
     flyPos.x += (fwd.x * f + right.x * r) * sp;
     flyPos.y += (fwd.y * f + u) * sp;
@@ -154,8 +163,8 @@ export function createCameraControls(camera, domElement, options) {
   }
 
   function applyPan() {
-    const f = (keysDown.w || keysDown.arrowup ? 1 : 0) - (keysDown.s || keysDown.arrowdown ? 1 : 0);
-    const r = (keysDown.d || keysDown.arrowright ? 1 : 0) - (keysDown.a || keysDown.arrowleft ? 1 : 0);
+    const f = (keysDown.KeyW || keysDown.ArrowUp ? 1 : 0) - (keysDown.KeyS || keysDown.ArrowDown ? 1 : 0);
+    const r = (keysDown.KeyD || keysDown.ArrowRight ? 1 : 0) - (keysDown.KeyA || keysDown.ArrowLeft ? 1 : 0);
     const sp = camRadius * 0.01 * panSpeedScale;
     // camera sits at +sin(az), +cos(az) from camTarget, so "forward" points the opposite way
     const desiredX = (-Math.sin(camAzimuth) * f + Math.cos(camAzimuth) * r) * sp;

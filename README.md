@@ -35,9 +35,10 @@ the import map in `index.html` from a CDN.
 
 The **World profile** selector keeps the original procedural city available
 as **Legacy city** and adds **Megacity vertical slice**, a deterministic
-seeded district scene with terraced shelves, civic/market/archive profiles,
-roads, buildings, stairs, a switchback connector, animated traffic shader
-lines, and the red Blackwall boundary. Both modes use the same
+terrain-first scene with six terraced shelves, the authored City Center,
+animated center traffic lines, and the red-edged Blackwall boundary. The old
+outer districts are intentionally absent while they are rebuilt, and Phase 2
+roads are not active. Both modes use the same
 `init(ctx)`, `update(dt)`, and `dispose()` lifecycle so switching modes
 explicitly releases the previous GPU resources.
 
@@ -45,7 +46,9 @@ Replay controls capture camera waypoints, interpolate positions with
 per-segment Hermite timing and orientations with quaternion slerp, and
 support validated JSON import/export. During playback replay owns the camera;
 stopping restores normal orbit/fly controls. The megacity generator exposes
-diagnostics for chunk/worker readiness and seeded heightfield state.
+diagnostics for chunk/worker readiness and seeded terrain state. The HUD
+also reports live FPS, renderer draw calls, road segment count, and generation
+time.
 Mode changes show staged generation progress and keep the selected profile
 recoverable through a retry action if generation or render setup fails.
 User-facing failures include stable codes such as `E_GENERATION_FAILED`,
