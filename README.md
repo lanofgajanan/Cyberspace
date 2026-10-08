@@ -128,3 +128,8 @@ draw-call count (not raw triangle count) is usually the real bottleneck.
   doesn't load correctly, check the browser console first; it's more
   likely an import typo than a logic error, since the generation logic
   itself is carried over from a version that was tested and working.
+
+  ##Images
+
+  <img src="image1.png" alt="image 1">
+<img src="image1.png" alt="image 1">
