@@ -55,6 +55,7 @@ User-facing failures include stable codes such as `E_GENERATION_FAILED`,
 `E_SCENE_BUILD_FAILED`, and `E_REPLAY_IMPORT_INVALID` for easier diagnosis.
 
 ## File structure
+<img src="diagram.png" alt="gitdiagram png">
 
 ```
 index.html              Markup, styles link, import map, loads js/main.js
