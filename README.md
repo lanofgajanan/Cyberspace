@@ -131,5 +131,5 @@ draw-call count (not raw triangle count) is usually the real bottleneck.
 
   ##Images
 
-  <img src="image1.png" alt="image 1">
-<img src="image1.png" alt="image 1">
+  <img src="image1" alt="image 1">
+  <img src="image1" alt="image 1">
