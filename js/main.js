@@ -156,7 +156,7 @@ window.addEventListener("resize", () => {
 
 modeSelect.addEventListener("change", (e) => selectMode(e.target.value));
 loadingRetry.addEventListener("click", () => selectMode(selectedMode));
-const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, cameraControls, replay);
+const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, cameraControls, replay, camera);
 
 let last = performance.now();
 let statsLastAt = last;

@@ -154,9 +154,11 @@
     position: fixed;
     bottom: calc(68px + env(safe-area-inset-bottom, 0px));
     left: 16px;
-    width: 240px;
-    max-width: calc(100vw - 32px);
-    background: rgba(5, 11, 22, 0.92);
+    width: 250px;
+    max-height: min(460px, calc(100vh - 120px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: rgba(5, 11, 22, 0.94);
     border: 1px solid #2a6a80;
     border-radius: 3px;
     padding: 14px 16px;
@@ -166,14 +168,31 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     display: none;
+    box-shadow: 0 0 24px rgba(79, 209, 255, 0.12);
+  }
+  #settings-panel::-webkit-scrollbar { width: 4px; }
+  #settings-panel::-webkit-scrollbar-track { background: rgba(5, 11, 22, 0.5); }
+  #settings-panel::-webkit-scrollbar-thumb { background: #2a6a80; border-radius: 2px; }
+  .settings-section {
+    color: #4fd1ff;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    font-weight: bold;
+    margin: 12px 0 6px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid rgba(42, 106, 128, 0.45);
+    text-shadow: 0 0 6px rgba(79, 209, 255, 0.4);
+  }
+  .settings-section:first-child {
+    margin-top: 0;
   }
   #settings-panel.open { display: block; }
-  #settings-panel .row { margin-bottom: 12px; }
+  #settings-panel .row { margin-bottom: 10px; }
   #settings-panel .row:last-child { margin-bottom: 0; }
   #settings-panel label {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     color: #8fb9c9;
   }
   #settings-panel input[type="range"] {

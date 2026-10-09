@@ -18,6 +18,7 @@ export function createCameraControls(camera, domElement, options) {
   let targetRadius = camRadius, targetAzimuth = camAzimuth, targetPolar = camPolar;
 
   const PAN_LIMIT = opts.panLimit || 330;
+  let easeDecayRate = 10.5;
 
   let isDragging = false;
   let dragButton = 0; // 0 = left (orbit), 1 = middle (pan), 2 = right (pan)
@@ -329,7 +330,7 @@ export function createCameraControls(camera, domElement, options) {
     applyPan(delta);
     if (driftEnabled) targetAzimuth += driftSpeed * (delta * 60);
 
-    const ease = 1 - Math.exp(-10.5 * delta); // approx 0.16 at 60fps
+    const ease = 1 - Math.exp(-easeDecayRate * delta);
     camTarget.x += (targetCamTarget.x - camTarget.x) * ease;
     camTarget.y += (targetCamTarget.y - camTarget.y) * ease;
     camTarget.z += (targetCamTarget.z - camTarget.z) * ease;
@@ -349,6 +350,7 @@ export function createCameraControls(camera, domElement, options) {
     setDriftSpeed: (v) => { driftSpeed = v; },
     setPanSpeedScale: (v) => { panSpeedScale = v; },
     setFlySpeedScale: (v) => { flySpeedScale = v; },
+    setEase: (v) => { easeDecayRate = Math.max(2, Math.min(32, v * 65)); },
     applyPreset,
     syncFromPose,
     getCamera: () => camera,

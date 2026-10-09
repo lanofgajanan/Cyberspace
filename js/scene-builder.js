@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BG_COLOR, EDGE_COLOR, WINDOW_COLOR, ACCENT_COLOR, GROUND_COLOR, blendedColor } from "./colors.js";
 import { subdivideToPoints, generateFillPoints, buildStreakVertexData } from "./streaks.js";
+import { facePoint } from "./geometry.js";
 
 const tempObj = new THREE.Object3D();
 
@@ -27,7 +28,12 @@ function buildBuildingMesh(buildingBoxes) {
   return mesh;
 }
 
-function buildGlitchMesh(glitchCubes) {
+function pseudoNoise(seed, step) {
+  const n = Math.sin(seed * 12.9898 + step * 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function buildGlitchMesh(glitchCubes, initialDensity = 0.65) {
   const mesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshBasicMaterial({ color: EDGE_COLOR, fog: true }),
@@ -40,6 +46,7 @@ function buildGlitchMesh(glitchCubes) {
     tempObj.updateMatrix();
     mesh.setMatrixAt(i, tempObj.matrix);
   });
+  mesh.count = Math.max(1, Math.min(glitchCubes.length, Math.floor(glitchCubes.length * initialDensity)));
   mesh.instanceMatrix.needsUpdate = true;
   mesh.frustumCulled = false;
   return mesh;
@@ -209,6 +216,113 @@ export function buildScene(scene, cityData, glitchCubes) {
     return denseDotView;
   }
 
+  const glitchAnimConfig = {
+    speedScale: 1.0,
+    extrudeScale: 1.0,
+    sizeScale: 1.0,
+    densityScale: 0.65,
+    jitterScale: 1.0,
+  };
+  let glitchTime = 0;
+
+  function updateGlitchCubes(dt) {
+    if (!glitchMesh || !glitchMesh.visible || !glitchCubes || glitchCubes.length === 0) return;
+    if (glitchAnimConfig.speedScale <= 0) return;
+
+    glitchTime += dt * glitchAnimConfig.speedScale;
+    const t = glitchTime;
+    const extrudeScale = glitchAnimConfig.extrudeScale;
+    const sizeScale = glitchAnimConfig.sizeScale;
+    const jitterScale = glitchAnimConfig.jitterScale;
+    const activeCount = Math.min(glitchMesh.count, glitchCubes.length);
+
+    for (let i = 0; i < activeCount; i++) {
+      const g = glitchCubes[i];
+      if (!g.b) continue;
+
+      const tau = t * g.burstFreq + g.seed;
+      const cycle = tau % 1.0;
+      const epoch = Math.floor(tau);
+
+      const eRand0 = pseudoNoise(g.seed, epoch);
+      const eRand1 = pseudoNoise(g.seed, epoch + 41.3);
+      const eRand2 = pseudoNoise(g.seed, epoch + 83.7);
+
+      let curU = g.baseU;
+      let curY = g.baseY;
+      let extrude = 0;
+      let curSize = g.baseSize * sizeScale;
+      let curRy = g.baseRy;
+
+      if (cycle < 0.52) {
+        // --- PHASE 1: DORMANT / FLUSH (52% of cycle) ---
+        // Sits flush on building facade with occasional micro-vibrations
+        const microHum = pseudoNoise(g.seed, Math.floor(t * 15)) > 0.82
+          ? (pseudoNoise(g.seed, Math.floor(t * 30)) - 0.5) * 0.05 * jitterScale
+          : 0;
+        extrude = microHum;
+        curU += microHum;
+      } else if (cycle < 0.64) {
+        // --- PHASE 2: PRE-BURST CORRUPT STUTTER (12% of cycle) ---
+        // Rapid high-frequency digital noise & scale blink before bursting out
+        const fastStep = Math.floor(t * g.stutterSpeed);
+        const jitterU = (pseudoNoise(g.seed, fastStep) - 0.5) * 0.22 * jitterScale;
+        const jitterY = (pseudoNoise(g.seed, fastStep + 17) - 0.5) * 0.22 * jitterScale;
+        curU += jitterU;
+        curY += jitterY;
+
+        extrude = ((cycle - 0.52) / 0.12) * 0.4 * extrudeScale;
+        const blink = pseudoNoise(g.seed, fastStep + 9) > 0.25 ? 1.0 : 0.35;
+        curSize *= blink;
+      } else if (cycle < 0.88) {
+        // --- PHASE 3: FULL CYBERSPACE GLITCH POP & QUANTIZED TELEPORT (24% of cycle) ---
+        // Pop out of wall in sharp geometric relief
+        const popWave = Math.sin((cycle - 0.64) / 0.24 * Math.PI);
+        const fastStep = Math.floor(t * g.stutterSpeed);
+        const popJitter = (pseudoNoise(g.seed, fastStep) - 0.5) * 0.15 * jitterScale;
+        extrude = (0.25 + popWave * g.extrudeMax + popJitter) * extrudeScale;
+
+        // Discrete voxel/grid jumping along building facade
+        const gridU = Math.floor((eRand0 - 0.5) * 6) * 0.35;
+        const gridY = Math.floor((eRand1 - 0.5) * 5) * 0.45;
+        const stepJitterX = (pseudoNoise(g.seed, fastStep + 5) - 0.5) * 0.25 * jitterScale;
+        const stepJitterY = (pseudoNoise(g.seed, fastStep + 11) - 0.5) * 0.25 * jitterScale;
+        curU = g.baseU + gridU + stepJitterX;
+        curY = g.baseY + gridY + stepJitterY;
+
+        // Discrete 90-degree snap rotations
+        const rotStep = Math.floor(eRand2 * 4) * (Math.PI / 2);
+        curRy = g.baseRy + rotStep;
+
+        // Expanded glitch packet size with occasional frame drops
+        const packetPulse = 1.15 + popWave * 0.45;
+        const dropFrame = pseudoNoise(g.seed, fastStep + 23) < 0.12 ? 0.2 : 1.0;
+        curSize *= packetPulse * dropFrame;
+      } else {
+        // --- PHASE 4: GLITCH COLLAPSE / REABSORPTION (12% of cycle) ---
+        // Snaps back into the wall facade with settling jitter
+        const fade = 1.0 - (cycle - 0.88) / 0.12;
+        const fastStep = Math.floor(t * 22);
+        const settleJitter = (pseudoNoise(g.seed, fastStep) - 0.5) * 0.1 * fade * jitterScale;
+        extrude = fade * 0.3 * extrudeScale + settleJitter;
+        curU += settleJitter;
+      }
+
+      curU = Math.max(-g.faceLen / 2 + 0.2, Math.min(g.faceLen / 2 - 0.2, curU));
+      curY = Math.max(-g.b.h / 2 + 0.5, Math.min(g.b.h / 2 - 0.5, curY));
+      const curN = g.faceNormalOffset + extrude;
+
+      const pos = facePoint(g.b, g.face, curU, curY, curN);
+
+      tempObj.position.set(pos[0], pos[1], pos[2]);
+      tempObj.rotation.set(0, curRy, 0);
+      tempObj.scale.set(curSize, curSize, curSize);
+      tempObj.updateMatrix();
+      glitchMesh.setMatrixAt(i, tempObj.matrix);
+    }
+    glitchMesh.instanceMatrix.needsUpdate = true;
+  }
+
   const DENSE_DOT_ZOOM_THRESHOLD = 150; // camera radius below this = "zoomed in enough" to show fill
 
   return {
@@ -216,7 +330,21 @@ export function buildScene(scene, cityData, glitchCubes) {
     terrainMesh, heatmapView, slopeView,
     sparseDotView, get denseDotView() { return denseDotView; }, ensureDenseDotView,
     get denseBuildMs() { return denseBuildMs; }, streakMat, DENSE_DOT_ZOOM_THRESHOLD,
-    update: (dt) => { if (trafficLine) trafficLine.userData.tick(dt); },
+    update: (dt) => {
+      if (trafficLine) trafficLine.userData.tick(dt);
+      updateGlitchCubes(dt);
+    },
+    setGlitchSpeedScale: (v) => { glitchAnimConfig.speedScale = v; },
+    setGlitchExtrudeScale: (v) => { glitchAnimConfig.extrudeScale = v; },
+    setGlitchSizeScale: (v) => { glitchAnimConfig.sizeScale = v; },
+    setGlitchDensityScale: (v) => {
+      glitchAnimConfig.densityScale = v;
+      if (glitchMesh && glitchCubes) {
+        glitchMesh.count = Math.max(1, Math.min(glitchCubes.length, Math.floor(glitchCubes.length * v)));
+        glitchMesh.instanceMatrix.needsUpdate = true;
+      }
+    },
+    setGlitchJitterScale: (v) => { glitchAnimConfig.jitterScale = v; },
     dispose: () => {
       scene.remove(buildingMesh, glitchMesh, lineView, heatmapView, slopeView, sparseDotView);
       terrainMesh.meshes.forEach((mesh) => scene.remove(mesh));

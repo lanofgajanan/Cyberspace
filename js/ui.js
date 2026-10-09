@@ -1,4 +1,4 @@
-export function wireUI(getSceneObjects, cameraControls, replay) {
+export function wireUI(getSceneObjects, cameraControls, replay, camera) {
   const getObjects = () => getSceneObjects() || {};
   const initial = getObjects();
   const { streakMat } = initial;
@@ -56,16 +56,52 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
 
   function wireSlider(id, onChange) {
     const el = document.getElementById(id);
+    if (!el) return;
     const out = document.getElementById(id + "-val");
     el.addEventListener("input", () => {
       const v = parseFloat(el.value);
-      if (out) out.textContent = el.dataset.fmt === "pct" ? Math.round(v * 100) + "%" : v;
+      if (out) {
+        if (el.dataset.fmt === "pct") out.textContent = Math.round(v * 100) + "%";
+        else if (el.dataset.fmt === "deg") out.textContent = Math.round(v) + "°";
+        else out.textContent = v;
+      }
       onChange(v);
     });
   }
   wireSlider("drift-speed-slider", (v) => cameraControls.setDriftSpeed(v));
   wireSlider("pan-speed-slider", (v) => cameraControls.setPanSpeedScale(v));
   wireSlider("fly-speed-slider", (v) => cameraControls.setFlySpeedScale(v));
+  wireSlider("fov-slider", (v) => {
+    if (camera) {
+      camera.fov = v;
+      camera.updateProjectionMatrix();
+    }
+  });
+  wireSlider("cam-smooth-slider", (v) => {
+    if (cameraControls.setEase) cameraControls.setEase(v);
+  });
+
+  wireSlider("glitch-density-slider", (v) => {
+    const objects = getObjects();
+    if (objects.setGlitchDensityScale) objects.setGlitchDensityScale(v);
+  });
+  wireSlider("glitch-speed-slider", (v) => {
+    const objects = getObjects();
+    if (objects.setGlitchSpeedScale) objects.setGlitchSpeedScale(v);
+  });
+  wireSlider("glitch-extrude-slider", (v) => {
+    const objects = getObjects();
+    if (objects.setGlitchExtrudeScale) objects.setGlitchExtrudeScale(v);
+  });
+  wireSlider("glitch-jitter-slider", (v) => {
+    const objects = getObjects();
+    if (objects.setGlitchJitterScale) objects.setGlitchJitterScale(v);
+  });
+  wireSlider("glitch-size-slider", (v) => {
+    const objects = getObjects();
+    if (objects.setGlitchSizeScale) objects.setGlitchSizeScale(v);
+  });
+
   wireSlider("streak-brightness-slider", (v) => { const objects = getObjects(); if (objects.streakMat) objects.streakMat.color.setScalar(v); });
   wireSlider("fog-slider", (v) => {
     const objects = getObjects();
