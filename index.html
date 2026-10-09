@@ -3,126 +3,568 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Net / Cyberspace — City</title>
+<title>Net / Cyberspace — City.OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
-<div id="canvas-wrap"></div>
+
 <div id="ui-layer">
-  <div id="hud">
-    Net // <span id="mode-status">legacy city</span><br/>
-    <span class="dim" id="stats">city data: generating…</span><br/>
-    <span class="dim" id="runtime-stats">FPS: -- · draw calls: -- · segments: -- · generation: --</span><br/>
-    <span class="dim" id="diagnostics">status: starting</span><br/>
-    <span class="dim">drag orbit · right-drag / middle-drag pan · scroll/pinch zoom · WASD pan</span><br/>
-    <span class="dim">Fly mode: click canvas to lock mouse · look to turn · WASD move · Space up / Ctrl down · Shift sprint · Esc unlocks · Tab hides UI</span>
-  </div>
-  <div id="loading" role="status" aria-live="polite">
-    <div class="loading-card">
-      <div class="loading-title">INITIALIZING CITY SIMULATION…</div>
-      <div class="progress-track" role="progressbar" aria-label="City generation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div id="loading-progress"></div>
-      </div>
-      <div id="loading-status">Preparing renderer</div>
-      <div id="loading-error" role="alert" hidden></div>
-      <button id="loading-retry" class="ctl-btn" type="button" hidden>Retry generation</button>
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="m14.5 3.4-5 8.6M20.4 9H10.2m7.3 10.6-5-8.6M3.6 15h10.2M6.5 4.4l5 8.6M6.5 19.6l5-8.6" />
+        </svg>
+      </span>
+      <span class="brand__name">CYBERSPACE</span>
+      <span class="brand__edition">CITY.OS / 0.7</span>
     </div>
-  </div>
-  <div id="mode-panel">
-    <label for="mode-select">World profile</label>
-    <select id="mode-select">
-      <option value="legacy" selected>Legacy city</option>
+
+    <div class="topbar__center">
+      <span class="status-dot"></span>
+      <span id="topbar-status-text">WORLD ONLINE</span>
+      <span class="topbar__divider"></span>
+      <span id="topbar-seed-indicator">SEED 0x7A21</span>
+    </div>
+
+    <div class="topbar__actions">
+      <a class="repository-link" href="https://github.com/lanofgajanan/Cyberspace" target="_blank" rel="noreferrer" title="View Source on GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 22v-3.9c.04-1-.35-1.98-1.1-2.65 3.6-.4 7.38-1.77 7.38-8A6.25 6.25 0 0 0 19.62 3a5.8 5.8 0 0 0-.16-4S18.15.57 15 2.38a15.4 15.4 0 0 0-8 0C3.85.57 2.54-1 2.54-1a5.8 5.8 0 0 0-.16 4A6.25 6.25 0 0 0 .72 7.45c0 6.22 3.78 7.59 7.38 8A3.64 3.64 0 0 0 7 18.1V22" />
+        </svg>
+        <span>VIEW SOURCE</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Tool Rail (Left) -->
+  <aside class="tool-rail" aria-label="Tool selection rail">
+    <div class="tool-rail__primary">
+      <button id="rail-scene" class="rail-button rail-button--active" data-tab="scene" aria-label="Scene & World Profiles" title="Scene & World Profile">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="m14.5 3.4-5 8.6M20.4 9H10.2m7.3 10.6-5-8.6M3.6 15h10.2M6.5 4.4l5 8.6M6.5 19.6l5-8.6" />
+        </svg>
+      </button>
+      <button id="rail-layers" class="rail-button" data-tab="layers" aria-label="Display Layers" title="Display Layers">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m12 3-9 5 9 5 9-5-9-5Z" />
+          <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+        </svg>
+      </button>
+      <button id="rail-replay" class="rail-button" data-tab="replay" aria-label="Camera Replay & Route" title="Camera Replay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="6" cy="18" r="2.5" />
+          <circle cx="18" cy="6" r="2.5" />
+          <path d="M8.5 18h2.2a2 2 0 0 0 2-2V8a2 2 0 0 1 2-2h.8" />
+        </svg>
+      </button>
+      <button id="rail-glitch" class="rail-button" data-tab="glitch" aria-label="Glitch Cubes Tuner" title="Glitch Cubes">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 21V5l8-3v19M12 8h8v13M2 21h20" />
+          <path d="M7 7h2M7 11h2M7 15h2M15 11h2M15 15h2" />
+        </svg>
+      </button>
+      <button id="rail-diagnostics" class="rail-button" data-tab="diagnostics" aria-label="System Diagnostics & Load" title="Diagnostics">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12h4l2-7 4 14 2-7h6" />
+        </svg>
+      </button>
+    </div>
+
+    <button id="rail-settings" class="rail-button" data-tab="settings" aria-label="Preferences & Settings" title="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      </svg>
+    </button>
+  </aside>
+
+  <!-- Viewport Frame (Center cell between panels) -->
+  <main id="viewport-container" class="viewport-frame" aria-label="3D City Viewport">
+    <div id="canvas-wrap"></div>
+
+    <div class="viewport-overlay">
+      <!-- Camera Chip -->
+      <div class="camera-chip" id="camera-chip">
+        <span>CAM</span>
+        <strong id="cam-chip-mode">ORBIT</strong>
+        <span class="sep">/</span>
+        <span id="cam-chip-angle">55° FOV</span>
+      </div>
+
+      <!-- Fly Mode Mouse Lock Indicator -->
+      <div class="fly-lock-indicator" id="fly-lock-indicator" style="display: none;">
+        <span>MOUSE LOOK ACTIVE</span>
+        <small>PRESS ESC TO RELEASE CURSOR</small>
+      </div>
+
+      <!-- Quick View Controls -->
+      <div class="view-controls">
+        <button id="cam-center-btn" aria-label="Center camera" title="Reset / Center camera">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="7" />
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          </svg>
+        </button>
+        <button id="cam-rotate-btn" class="drift-toggle" aria-label="Toggle camera drift" title="Auto-rotate / Drift">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 7v5h-5" />
+            <path d="M18.5 16A8 8 0 1 1 20 12" />
+          </svg>
+        </button>
+        <button id="cam-fullscreen-btn" aria-label="Toggle Fullscreen" title="Fullscreen">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Inspector Panel (Right) -->
+  <aside id="inspector-panel" class="inspector" aria-label="Inspector panel">
+    <div class="inspector__header">
+      <div>
+        <span class="panel-kicker" id="inspector-kicker">SCENE CONTROL</span>
+        <h2 id="inspector-title">World Inspector</h2>
+      </div>
+      <button id="collapse-inspector-btn" class="collapse-button" aria-label="Collapse inspector" title="Collapse Inspector">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Hidden compatibility select for existing scripts -->
+    <select id="mode-select" hidden aria-hidden="true">
+      <option value="legacy">Legacy city</option>
       <option value="megacity">Megacity profile</option>
     </select>
-  </div>
 
-  <div id="settings-panel">
-    <div class="settings-section">Camera controls</div>
-    <div class="row">
-      <label>Drift speed <span id="drift-speed-slider-val">0.0015</span></label>
-      <input type="range" id="drift-speed-slider" min="0.0002" max="0.006" step="0.0001" value="0.0015" />
-    </div>
-    <div class="row">
-      <label>Pan speed <span id="pan-speed-slider-val">1</span></label>
-      <input type="range" id="pan-speed-slider" min="0.3" max="2.5" step="0.1" value="1" />
-    </div>
-    <div class="row">
-      <label>Fly speed <span id="fly-speed-slider-val">1</span></label>
-      <input type="range" id="fly-speed-slider" min="0.3" max="3" step="0.1" value="1" />
-    </div>
-    <div class="row">
-      <label>Field of view <span id="fov-slider-val">55°</span></label>
-      <input type="range" id="fov-slider" data-fmt="deg" min="35" max="85" step="1" value="55" />
-    </div>
-    <div class="row">
-      <label>Smoothness <span id="cam-smooth-slider-val">16%</span></label>
-      <input type="range" id="cam-smooth-slider" data-fmt="pct" min="0.05" max="0.35" step="0.01" value="0.16" />
-    </div>
+    <!-- Tab Pane 1: Scene & World Profile -->
+    <div id="pane-scene" class="inspector-content-pane is-active">
+      <div class="inspector__section">
+        <span class="section-label">WORLD PROFILE</span>
+        <div class="segmented-control" role="group" aria-label="World profile selection">
+          <button id="btn-profile-megacity" type="button">MEGACITY</button>
+          <button id="btn-profile-legacy" class="is-active" type="button">LEGACY</button>
+        </div>
 
-    <div class="settings-section">Glitch cubes</div>
-    <div class="row">
-      <label>Cube count <span id="glitch-density-slider-val">65%</span></label>
-      <input type="range" id="glitch-density-slider" data-fmt="pct" min="0.1" max="1" step="0.05" value="0.65" />
-    </div>
-    <div class="row">
-      <label>Anim speed <span id="glitch-speed-slider-val">100%</span></label>
-      <input type="range" id="glitch-speed-slider" data-fmt="pct" min="0" max="3" step="0.1" value="1" />
-    </div>
-    <div class="row">
-      <label>Extrusion <span id="glitch-extrude-slider-val">100%</span></label>
-      <input type="range" id="glitch-extrude-slider" data-fmt="pct" min="0.2" max="2.5" step="0.1" value="1" />
-    </div>
-    <div class="row">
-      <label>Jitter intensity <span id="glitch-jitter-slider-val">100%</span></label>
-      <input type="range" id="glitch-jitter-slider" data-fmt="pct" min="0" max="2.5" step="0.1" value="1" />
-    </div>
-    <div class="row">
-      <label>Cube size <span id="glitch-size-slider-val">100%</span></label>
-      <input type="range" id="glitch-size-slider" data-fmt="pct" min="0.4" max="2" step="0.1" value="1" />
-    </div>
-
-    <div class="settings-section">Atmosphere</div>
-    <div class="row">
-      <label>Streak brightness <span id="streak-brightness-slider-val">100%</span></label>
-      <input type="range" id="streak-brightness-slider" data-fmt="pct" min="0.2" max="1" step="0.05" value="1" />
-    </div>
-    <div class="row">
-      <label>Fog amount <span id="fog-slider-val">100%</span></label>
-      <input type="range" id="fog-slider" data-fmt="pct" min="0" max="1" step="0.05" value="1" />
-    </div>
-  </div>
-
-  <div id="btn-row">
-    <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
-    <button id="drift-toggle" class="ctl-btn" type="button">Start drift</button>
-    <button id="view-toggle" class="ctl-btn" type="button">Dot view</button>
-    <button id="glitch-toggle" class="ctl-btn" type="button">Hide glitch cubes</button>
-    <button id="settings-toggle" class="ctl-btn" type="button">⚙ Settings</button>
-    <button id="terrain-heatmap-toggle" class="ctl-btn" type="button" hidden>Terrain heatmap</button>
-    <button id="terrain-slope-toggle" class="ctl-btn" type="button" hidden>Terrain slope</button>
-  </div>
-  <div id="dock-right">
-    <details id="views-panel" class="menu-panel">
-      <summary class="ctl-btn">Views</summary>
-      <div class="views-controls">
-        <button id="preset-overview" class="ctl-btn" type="button">Overview</button>
-        <button id="preset-street" class="ctl-btn" type="button">Street view</button>
-        <button id="preset-iso" class="ctl-btn" type="button">Isometric</button>
+        <div class="world-card" id="world-card">
+          <div class="world-card__top">
+            <span class="world-card__index" id="world-card-index">01</span>
+            <span id="world-card-subtitle">PROCEDURAL CITY</span>
+            <span class="world-card__ready" id="world-card-status">READY</span>
+          </div>
+          <p id="world-card-desc">Rotated Downtown Grid & Buildings</p>
+          <div class="world-card__meta">
+            <span>SEED</span>
+            <strong id="world-card-seed">1337</strong>
+            <span>BLOCKS</span>
+            <strong id="world-card-chunks">18 / 18</strong>
+          </div>
+        </div>
       </div>
-    </details>
-    <details id="replay-panel" class="menu-panel">
-      <summary class="ctl-btn">Replay</summary>
-      <div class="replay-controls">
-        <div id="replay-status" class="replay-status-text">Waypoints: 0 (0.0s)</div>
-        <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
-        <button id="replay-undo" class="ctl-btn" type="button">Undo waypoint</button>
-        <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
-        <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
-        <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
-        <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
-        <input id="replay-file" type="file" accept="application/json" hidden />
+
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">CAMERA PRESETS</span>
+          <span>03</span>
+        </div>
+        <div class="preset-grid">
+          <button id="preset-overview" class="ctl-btn" type="button">Overview</button>
+          <button id="preset-street" class="ctl-btn" type="button">Street</button>
+          <button id="preset-iso" class="ctl-btn" type="button">Isometric</button>
+        </div>
       </div>
-    </details>
+    </div>
+
+    <!-- Tab Pane 2: Display Layers -->
+    <div id="pane-layers" class="inspector-content-pane">
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">DISPLAY LAYERS</span>
+          <span>08</span>
+        </div>
+
+        <button class="toggle-row" id="layer-structures-toggle" aria-pressed="true">
+          <span class="toggle-row__copy">
+            <span>Structures</span>
+            <small>Instanced building geometry</small>
+          </span>
+          <span class="switch switch--on"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="layer-roads-toggle" aria-pressed="true">
+          <span class="toggle-row__copy">
+            <span>Road network</span>
+            <small>Surface streets and avenues</small>
+          </span>
+          <span class="switch switch--on"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="view-toggle" aria-pressed="false">
+          <span class="toggle-row__copy">
+            <span>Dot streak view</span>
+            <small>Cyberpunk vertical matrix dots</small>
+          </span>
+          <span class="switch"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="layer-traffic-toggle" aria-pressed="true">
+          <span class="toggle-row__copy">
+            <span>Traffic flow</span>
+            <small>Megacity center traffic pulses</small>
+          </span>
+          <span class="switch switch--on"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="layer-blackwall-toggle" aria-pressed="true">
+          <span class="toggle-row__copy">
+            <span>Blackwall boundary</span>
+            <small>Megacity red-edged perimeter</small>
+          </span>
+          <span class="switch switch--on"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="glitch-toggle" aria-pressed="true">
+          <span class="toggle-row__copy">
+            <span>Glitch cubes</span>
+            <small>Extruding facade voxel packets</small>
+          </span>
+          <span class="switch switch--on"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="terrain-heatmap-toggle" aria-pressed="false">
+          <span class="toggle-row__copy">
+            <span>Terrain heatmap</span>
+            <small>Elevation terrace diagnostic</small>
+          </span>
+          <span class="switch"><span></span></span>
+        </button>
+
+        <button class="toggle-row" id="terrain-slope-toggle" aria-pressed="false">
+          <span class="toggle-row__copy">
+            <span>Terrain slope</span>
+            <small>Steepness color overlay</small>
+          </span>
+          <span class="switch"><span></span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab Pane 3: Replay & Route -->
+    <div id="pane-replay" class="inspector-content-pane">
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">WAYPOINT REPLAY</span>
+          <span>HERMITE</span>
+        </div>
+
+        <div id="replay-status" class="diagnostics-box">Waypoints: 0 (0.0s)</div>
+
+        <div class="replay-action-grid">
+          <button id="replay-capture" class="ctl-btn" type="button">Capture Waypoint</button>
+          <button id="replay-undo" class="ctl-btn" type="button">Undo Waypoint</button>
+          <button id="replay-play" class="ctl-btn" type="button">Play Replay</button>
+          <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
+          <button id="replay-toggle-path" class="ctl-btn" type="button">Hide Path</button>
+          <button id="replay-export" class="ctl-btn" type="button">Export JSON</button>
+          <button id="replay-import" class="ctl-btn ctl-btn--block" style="grid-column: 1 / -1;" type="button">Import JSON</button>
+          <input id="replay-file" type="file" accept="application/json" hidden />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Pane 4: Glitch Tuner -->
+    <div id="pane-glitch" class="inspector-content-pane">
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">VOXEL GLITCH TUNING</span>
+          <span>LEGACY</span>
+        </div>
+
+        <label class="range-setting">
+          <span>
+            <span>Cube density</span>
+            <strong id="glitch-density-slider-val">65%</strong>
+          </span>
+          <input type="range" id="glitch-density-slider" data-fmt="pct" min="0" max="1" step="0.05" value="0.65" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Anim speed</span>
+            <strong id="glitch-speed-slider-val">100%</strong>
+          </span>
+          <input type="range" id="glitch-speed-slider" data-fmt="pct" min="0" max="3" step="0.1" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Extrusion</span>
+            <strong id="glitch-extrude-slider-val">100%</strong>
+          </span>
+          <input type="range" id="glitch-extrude-slider" data-fmt="pct" min="0.2" max="2.5" step="0.1" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Jitter intensity</span>
+            <strong id="glitch-jitter-slider-val">100%</strong>
+          </span>
+          <input type="range" id="glitch-jitter-slider" data-fmt="pct" min="0" max="2.5" step="0.1" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Cube size</span>
+            <strong id="glitch-size-slider-val">100%</strong>
+          </span>
+          <input type="range" id="glitch-size-slider" data-fmt="pct" min="0.4" max="2" step="0.1" value="1" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Tab Pane 5: Diagnostics & Load -->
+    <div id="pane-diagnostics" class="inspector-content-pane">
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">SYSTEM LOAD</span>
+          <span id="load-optimal-badge">OPTIMAL</span>
+        </div>
+
+        <div class="metric">
+          <div><span>GEOMETRY BUDGET</span><strong id="metric-geometry-val">62%</strong></div>
+          <span class="metric__bar"><i id="metric-geometry-bar" style="width: 62%;"></i></span>
+        </div>
+
+        <div class="metric">
+          <div><span>GPU DRAW BUFFER</span><strong id="metric-gpu-val">38%</strong></div>
+          <span class="metric__bar"><i id="metric-gpu-bar" style="width: 38%;"></i></span>
+        </div>
+      </div>
+
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">GENERATION DIAGNOSTICS</span>
+          <span>TELEMETRY</span>
+        </div>
+        <div id="diagnostics" class="diagnostics-box">status: starting</div>
+        <!-- Backward-compatibility elements -->
+        <div id="stats" hidden></div>
+        <div id="runtime-stats" hidden></div>
+        <span id="mode-status" hidden>legacy city</span>
+      </div>
+    </div>
+
+    <!-- Tab Pane 6: Preferences & Settings -->
+    <div id="pane-settings" class="inspector-content-pane">
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">APPEARANCE</span>
+          <span>THEME</span>
+        </div>
+
+        <label class="color-setting">
+          <span class="color-setting__copy">
+            <span>Edge / Accent color</span>
+            <small>City lines, glow and UI highlight</small>
+          </span>
+          <span class="color-setting__control">
+            <input type="color" id="setting-edge-color" value="#ef5b37" aria-label="Edge accent color" />
+            <span id="setting-edge-color-hex">#EF5B37</span>
+          </span>
+        </label>
+
+        <label class="color-setting">
+          <span class="color-setting__copy">
+            <span>Viewport background</span>
+            <small>Deep cyberspace clear color</small>
+          </span>
+          <span class="color-setting__control">
+            <input type="color" id="setting-bg-color" value="#050b16" aria-label="Background color" />
+            <span id="setting-bg-color-hex">#050B16</span>
+          </span>
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Streak brightness</span>
+            <strong id="streak-brightness-slider-val">100%</strong>
+          </span>
+          <input type="range" id="streak-brightness-slider" data-fmt="pct" min="0.2" max="1" step="0.05" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Fog density</span>
+            <strong id="fog-slider-val">100%</strong>
+          </span>
+          <input type="range" id="fog-slider" data-fmt="pct" min="0" max="1" step="0.05" value="1" />
+        </label>
+      </div>
+
+      <div class="inspector__section">
+        <div class="section-heading">
+          <span class="section-label">CAMERA DYNAMICS</span>
+          <span>CONTROLS</span>
+        </div>
+
+        <label class="range-setting">
+          <span>
+            <span>Drift speed</span>
+            <strong id="drift-speed-slider-val">0.0015</strong>
+          </span>
+          <input type="range" id="drift-speed-slider" min="0.0002" max="0.006" step="0.0001" value="0.0015" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Pan speed</span>
+            <strong id="pan-speed-slider-val">1</strong>
+          </span>
+          <input type="range" id="pan-speed-slider" min="0.3" max="2.5" step="0.1" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Fly speed</span>
+            <strong id="fly-speed-slider-val">1</strong>
+          </span>
+          <input type="range" id="fly-speed-slider" min="0.3" max="3" step="0.1" value="1" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Field of view</span>
+            <strong id="fov-slider-val">55°</strong>
+          </span>
+          <input type="range" id="fov-slider" data-fmt="deg" min="35" max="85" step="1" value="55" />
+        </label>
+
+        <label class="range-setting">
+          <span>
+            <span>Smoothness</span>
+            <strong id="cam-smooth-slider-val">16%</strong>
+          </span>
+          <input type="range" id="cam-smooth-slider" data-fmt="pct" min="0.05" max="0.35" step="0.01" value="0.16" />
+        </label>
+      </div>
+
+      <div class="inspector__section">
+        <button id="settings-reset-btn" class="ctl-btn ctl-btn--block" type="button">RESET TO DEFAULTS</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Inspector floating tab when collapsed -->
+  <button id="inspector-tab" class="inspector-tab" style="display: none;" aria-label="Open inspector" title="Open Inspector">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="m12 3-9 5 9 5 9-5-9-5Z" />
+      <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+    </svg>
+    <span id="inspector-tab-label">INSPECT</span>
+  </button>
+
+  <!-- Bottom Telemetry Bar -->
+  <footer class="telemetry">
+    <div class="telemetry__stats" id="telemetry-stats">
+      <div>
+        <span>FPS</span>
+        <strong id="telemetry-fps">--</strong>
+      </div>
+      <div>
+        <span>DRAW CALLS</span>
+        <strong id="telemetry-drawcalls">--</strong>
+      </div>
+      <div>
+        <span>GEN TIME</span>
+        <strong id="telemetry-gentime">--</strong>
+      </div>
+      <div>
+        <span>SEGMENTS</span>
+        <strong id="telemetry-segments">--</strong>
+      </div>
+    </div>
+
+    <div class="replay" aria-label="Timeline and replay controls">
+      <button id="telemetry-replay-play" class="replay__control" aria-label="Play or pause replay" title="Play / Pause Replay">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m8 5 11 7-11 7V5Z" />
+        </svg>
+      </button>
+
+      <span id="telemetry-replay-elapsed" class="replay__time">00:00</span>
+
+      <div class="timeline" id="telemetry-timeline" role="slider" aria-label="Replay timeline progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="timeline__elapsed" id="telemetry-elapsed-bar"></span>
+        <span class="timeline__playhead" id="telemetry-playhead"></span>
+      </div>
+
+      <span id="telemetry-replay-duration" class="replay__time replay__time--muted">00:00</span>
+
+      <button id="telemetry-replay-rec" class="record-button" type="button" title="Capture waypoint at current camera position">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="12" cy="12" r="6" />
+        </svg>
+        <span>REC</span>
+      </button>
+    </div>
+
+    <div class="telemetry__mode">
+      <span>NAV MODE</span>
+      <button id="fly-toggle" class="mode-pill" type="button" title="Toggle between Orbit and Fly Camera">ORBIT</button>
+      <button id="telemetry-help-btn" class="key-hint" type="button" title="Keyboard and mouse help (Press H)">H</button>
+      <span class="key-hint" title="Press Tab to hide/show UI">TAB</span>
+    </div>
+  </footer>
+</div>
+
+<!-- High-tech Cyberpunk Loading Screen -->
+<div id="loading" role="status" aria-live="polite">
+  <div class="loading-card">
+    <div class="loading-title">INITIALIZING CITY SIMULATION…</div>
+    <div class="progress-track" role="progressbar" aria-label="City generation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="loading-progress"></div>
+    </div>
+    <div id="loading-status">Preparing renderer</div>
+    <div id="loading-error" role="alert" hidden></div>
+    <button id="loading-retry" class="ctl-btn ctl-btn--block" type="button" hidden>Retry generation</button>
+  </div>
+</div>
+
+<!-- Help Modal Dialog -->
+<div id="help-dialog" class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="help-card">
+    <div class="help-card__header">
+      <h3 id="help-title">CYBERSPACE NAVIGATION CONTROLS</h3>
+      <button id="help-close-btn" class="collapse-button" aria-label="Close help modal">✕</button>
+    </div>
+    <div class="help-grid">
+      <div class="help-row"><span>Orbit Mode</span><span>Left-drag to rotate · Right-drag or Middle-drag to pan</span></div>
+      <div class="help-row"><span>Zoom</span><span>Scroll wheel or pinch gesture</span></div>
+      <div class="help-row"><span>Keyboard Pan</span><span>W / A / S / D keys pan camera target</span></div>
+      <div class="help-row"><span>Fly Mode</span><span>Click canvas to lock mouse · Look to steer</span></div>
+      <div class="help-row"><span>Fly Movement</span><span>W / S / A / D move · Space up · Ctrl down · Shift sprint</span></div>
+      <div class="help-row"><span>Exit Fly</span><span>Press Esc to unlock mouse cursor</span></div>
+      <div class="help-row"><span>Clean View</span><span>Press Tab to toggle the entire HUD on/off</span></div>
+      <div class="help-row"><span>Help Modal</span><span>Press H anytime to toggle this control guide</span></div>
+    </div>
   </div>
 </div>
 
@@ -155,31 +597,16 @@
       clearTimeout(timeout);
       loading.hidden = true;
       loading.classList.add("is-hidden");
-      loading.setAttribute("aria-hidden", "true");
+      error.hidden = true;
+      retry.hidden = true;
     },
-    fail: fail
+    fail: fail,
+    isReady: function () { return ready; },
   };
-  retry.addEventListener("click", function () { window.location.reload(); });
-  window.addEventListener("error", function (event) {
-    fail("E_STARTUP_FAILED: " + (event.message || "The city could not be started."));
-  });
-  window.addEventListener("unhandledrejection", function (event) {
-    var reason = event.reason && event.reason.message ? event.reason.message : event.reason;
-    fail("E_STARTUP_FAILED: " + (reason || "The city could not be started."));
-  });
-}());
+})();
 </script>
 
-<!-- Import map so every module can just `import * as THREE from "three"`
-     instead of hardcoding a CDN URL in every single file. Bump the
-     version here in one place if you ever want to upgrade Three.js. -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"
-  }
-}
-</script>
 <script type="module" src="js/main.js"></script>
+
 </body>
 </html>
