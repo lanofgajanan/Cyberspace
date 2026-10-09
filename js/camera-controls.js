@@ -126,7 +126,7 @@ export function createCameraControls(camera, domElement, options) {
     const fwd = flyForward(), right = flyRight();
     const f = (keysDown.KeyW || keysDown.ArrowUp ? 1 : 0) - (keysDown.KeyS || keysDown.ArrowDown ? 1 : 0);
     const r = (keysDown.KeyD || keysDown.ArrowRight ? 1 : 0) - (keysDown.KeyA || keysDown.ArrowLeft ? 1 : 0);
-    const u = (keysDown.Space ? 1 : 0) - (keysDown.Control ? 1 : 0);
+    const u = (keysDown.Space ? 1 : 0) - (keysDown.ControlLeft ? 1 : 0);
     const sp = FLY_SPEED_BASE * flySpeedScale;
     flyPos.x += (fwd.x * f + right.x * r) * sp;
     flyPos.y += (fwd.y * f + u) * sp;
