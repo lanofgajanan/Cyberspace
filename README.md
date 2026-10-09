@@ -14,6 +14,8 @@ The project is built around procedural generation, deterministic world states, c
 
 <img src="image2" alt="Net / Cyberspace City">
 
+<img src="image3" alt="Net / Cyberspace City">
+
 ---
 
 ## Running Locally
