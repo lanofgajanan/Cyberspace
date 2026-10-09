@@ -109,6 +109,15 @@
     border: 1px solid #2a6a80;
     background: rgba(5, 11, 22, 0.94);
   }
+  .replay-status-text {
+    width: 100%;
+    color: #4fd1ff;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 2px 4px;
+    text-align: left;
+    text-shadow: 0 0 6px rgba(79, 209, 255, 0.5);
+  }
 
   #settings-panel {
     position: fixed;

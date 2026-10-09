@@ -6,18 +6,53 @@ const validWaypoint = (w) => w && Array.isArray(w.position) && w.position.length
 
 export function createCameraReplay(cameraControls) {
   let waypoints = [];
-  let playing = false, elapsed = 0;
+  let playing = false, elapsed = 0, looping = false;
+  const statusListeners = [];
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), d = new THREE.Vector3();
   const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+
+  function getTotalDuration() {
+    if (waypoints.length < 2) return 0;
+    return waypoints.slice(0, -1).reduce((sum, w) => sum + w.duration, 0);
+  }
+
+  function getStatus() {
+    return {
+      count: waypoints.length,
+      duration: getTotalDuration(),
+      playing,
+      looping,
+      elapsed,
+    };
+  }
+
+  function notifyStatus() {
+    const s = getStatus();
+    for (const fn of statusListeners) {
+      try { fn(s); } catch (_) {}
+    }
+  }
+
   function validate(input) {
     if (!input || input.version !== VERSION || !Array.isArray(input.waypoints) || input.waypoints.length < 2 || input.waypoints.some((w) => !validWaypoint(w))) {
       throw new Error("Replay JSON must be version 1 with at least two valid waypoints.");
     }
     return input.waypoints;
   }
+
   function capture(duration = 3) {
     waypoints.push({ position: cameraControls.getCamera().position.toArray(), quaternion: cameraControls.getCamera().quaternion.toArray(), duration });
+    notifyStatus();
   }
+
+  function undo() {
+    if (waypoints.length > 0) {
+      waypoints.pop();
+      if (playing && waypoints.length < 2) stop();
+      notifyStatus();
+    }
+  }
+
   function poseAt(time) {
     let t = time;
     for (let i = 0; i < waypoints.length - 1; i++) {
@@ -36,21 +71,87 @@ export function createCameraReplay(cameraControls) {
     const last = waypoints[waypoints.length - 1];
     return { position: new THREE.Vector3().fromArray(last.position), quaternion: new THREE.Quaternion().fromArray(last.quaternion) };
   }
+
+  function stop() {
+    if (!playing) return;
+    playing = false;
+    const finalPose = poseAt(elapsed);
+    if (cameraControls.syncFromPose) {
+      cameraControls.syncFromPose(finalPose.position, finalPose.quaternion);
+    }
+    cameraControls.clearReplayPose();
+    notifyStatus();
+  }
+
+  function play() {
+    if (waypoints.length >= 2) {
+      elapsed = 0;
+      playing = true;
+      cameraControls.setReplayPose(poseAt(0));
+      notifyStatus();
+    }
+  }
+
+  function togglePlay() {
+    if (playing) stop();
+    else play();
+  }
+
+  function toggleLoop() {
+    looping = !looping;
+    notifyStatus();
+    return looping;
+  }
+
   return {
     capture,
-    clear: () => { waypoints = []; playing = false; cameraControls.clearReplayPose(); },
+    undo,
+    clear: () => {
+      waypoints = [];
+      playing = false;
+      cameraControls.clearReplayPose();
+      notifyStatus();
+    },
     exportJSON: () => JSON.stringify({ version: VERSION, waypoints }, null, 2),
-    importJSON: (text) => { const parsed = JSON.parse(text); waypoints = validate(parsed); elapsed = 0; },
+    importJSON: (text) => {
+      const parsed = JSON.parse(text);
+      waypoints = validate(parsed);
+      elapsed = 0;
+      notifyStatus();
+    },
     getWaypoints: () => waypoints,
-    play: () => { if (waypoints.length >= 2) { elapsed = 0; playing = true; cameraControls.setReplayPose(poseAt(0)); } },
-    stop: () => { playing = false; cameraControls.clearReplayPose(); },
+    play,
+    stop,
+    togglePlay,
+    toggleLoop,
+    isLooping: () => looping,
+    isPlaying: () => playing,
+    getStatus,
+    onStatusChange: (fn) => {
+      statusListeners.push(fn);
+      fn(getStatus());
+    },
     update: (dt) => {
       if (!playing) return;
       elapsed += dt;
-      const total = waypoints.slice(0, -1).reduce((sum, w) => sum + w.duration, 0);
-      if (elapsed >= total) { elapsed = total; playing = false; }
+      const total = getTotalDuration();
+      if (total > 0 && elapsed >= total) {
+        if (looping) {
+          elapsed = elapsed % total;
+        } else {
+          elapsed = total;
+          playing = false;
+          const finalPose = poseAt(elapsed);
+          if (cameraControls.syncFromPose) {
+            cameraControls.syncFromPose(finalPose.position, finalPose.quaternion);
+          }
+          cameraControls.clearReplayPose();
+          notifyStatus();
+          return;
+        }
+      }
       cameraControls.setReplayPose(poseAt(elapsed));
-      if (!playing) cameraControls.clearReplayPose();
+      notifyStatus();
     },
   };
 }

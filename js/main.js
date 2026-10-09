@@ -160,7 +160,7 @@ let statsFrameCount = 0;
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  cameraControls.tick();
+  cameraControls.tick(dt);
   replay.update(dt);
   lifecycle.update(dt);
   if (ui.getShowingDots() && lifecycle.active) {

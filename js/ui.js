@@ -65,6 +65,7 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
   }
   wireSlider("drift-speed-slider", (v) => cameraControls.setDriftSpeed(v));
   wireSlider("pan-speed-slider", (v) => cameraControls.setPanSpeedScale(v));
+  wireSlider("fly-speed-slider", (v) => cameraControls.setFlySpeedScale(v));
   wireSlider("streak-brightness-slider", (v) => { const objects = getObjects(); if (objects.streakMat) objects.streakMat.color.setScalar(v); });
   wireSlider("fog-slider", (v) => {
     const objects = getObjects();
@@ -74,8 +75,43 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
     objects.scene.fog.far = 950 + (1 - v) * 4000;
   });
 
-  document.getElementById("replay-capture").addEventListener("click", () => replay.capture());
-  document.getElementById("replay-play").addEventListener("click", () => replay.play());
+  function wirePreset(id, name) {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener("click", () => cameraControls.applyPreset(name));
+  }
+  wirePreset("preset-overview", "overview");
+  wirePreset("preset-street", "street");
+  wirePreset("preset-iso", "isometric");
+
+  const replayCaptureBtn = document.getElementById("replay-capture");
+  const replayUndoBtn = document.getElementById("replay-undo");
+  const replayPlayBtn = document.getElementById("replay-play");
+  const replayLoopBtn = document.getElementById("replay-loop");
+  const replayStatus = document.getElementById("replay-status");
+
+  if (replayCaptureBtn) replayCaptureBtn.addEventListener("click", () => replay.capture());
+  if (replayUndoBtn) replayUndoBtn.addEventListener("click", () => replay.undo());
+  if (replayPlayBtn) replayPlayBtn.addEventListener("click", () => (replay.togglePlay ? replay.togglePlay() : replay.play()));
+  if (replayLoopBtn) replayLoopBtn.addEventListener("click", () => (replay.toggleLoop ? replay.toggleLoop() : null));
+
+  if (replay.onStatusChange) {
+    replay.onStatusChange((s) => {
+      if (replayStatus) {
+        if (s.playing) {
+          replayStatus.textContent = `Playing: ${s.elapsed.toFixed(1)}s / ${s.duration.toFixed(1)}s`;
+        } else {
+          replayStatus.textContent = `Waypoints: ${s.count} (${s.duration.toFixed(1)}s)`;
+        }
+      }
+      if (replayPlayBtn) {
+        replayPlayBtn.textContent = s.playing ? "Stop replay" : "Play replay";
+      }
+      if (replayLoopBtn) {
+        replayLoopBtn.textContent = s.looping ? "Loop: On" : "Loop: Off";
+      }
+    });
+  }
+
   document.getElementById("replay-export").addEventListener("click", () => {
     const blob = new Blob([replay.exportJSON()], { type: "application/json" });
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "cyberspace-replay.json"; link.click();
