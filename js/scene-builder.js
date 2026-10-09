@@ -34,6 +34,18 @@ function pseudoNoise(seed, step) {
 }
 
 function buildGlitchMesh(glitchCubes, initialDensity = 0.65) {
+  if (!glitchCubes || glitchCubes.length === 0) {
+    const mesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({ color: EDGE_COLOR, fog: true }),
+      1
+    );
+    mesh.count = 0;
+    mesh.visible = false;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.frustumCulled = false;
+    return mesh;
+  }
   const mesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshBasicMaterial({ color: EDGE_COLOR, fog: true }),
@@ -46,7 +58,9 @@ function buildGlitchMesh(glitchCubes, initialDensity = 0.65) {
     tempObj.updateMatrix();
     mesh.setMatrixAt(i, tempObj.matrix);
   });
-  mesh.count = Math.max(1, Math.min(glitchCubes.length, Math.floor(glitchCubes.length * initialDensity)));
+  const targetCount = Math.max(0, Math.min(glitchCubes.length, Math.round(glitchCubes.length * initialDensity)));
+  mesh.count = targetCount;
+  mesh.visible = targetCount > 0;
   mesh.instanceMatrix.needsUpdate = true;
   mesh.frustumCulled = false;
   return mesh;
@@ -216,6 +230,7 @@ export function buildScene(scene, cityData, glitchCubes) {
     return denseDotView;
   }
 
+  let glitchUserVisible = true;
   const glitchAnimConfig = {
     speedScale: 1.0,
     extrudeScale: 1.0,
@@ -224,10 +239,12 @@ export function buildScene(scene, cityData, glitchCubes) {
     jitterScale: 1.0,
   };
   let glitchTime = 0;
+  let glitchNeedsStaticUpdate = false;
 
   function updateGlitchCubes(dt) {
-    if (!glitchMesh || !glitchMesh.visible || !glitchCubes || glitchCubes.length === 0) return;
-    if (glitchAnimConfig.speedScale <= 0) return;
+    if (!glitchMesh || !glitchMesh.visible || !glitchCubes || glitchCubes.length === 0 || glitchMesh.count === 0) return;
+    if (glitchAnimConfig.speedScale <= 0 && !glitchNeedsStaticUpdate) return;
+    glitchNeedsStaticUpdate = false;
 
     glitchTime += dt * glitchAnimConfig.speedScale;
     const t = glitchTime;
@@ -334,17 +351,28 @@ export function buildScene(scene, cityData, glitchCubes) {
       if (trafficLine) trafficLine.userData.tick(dt);
       updateGlitchCubes(dt);
     },
-    setGlitchSpeedScale: (v) => { glitchAnimConfig.speedScale = v; },
-    setGlitchExtrudeScale: (v) => { glitchAnimConfig.extrudeScale = v; },
-    setGlitchSizeScale: (v) => { glitchAnimConfig.sizeScale = v; },
+    setGlitchSpeedScale: (v) => { glitchAnimConfig.speedScale = v; glitchNeedsStaticUpdate = true; },
+    setGlitchExtrudeScale: (v) => { glitchAnimConfig.extrudeScale = v; glitchNeedsStaticUpdate = true; },
+    setGlitchSizeScale: (v) => { glitchAnimConfig.sizeScale = v; glitchNeedsStaticUpdate = true; },
     setGlitchDensityScale: (v) => {
       glitchAnimConfig.densityScale = v;
+      if (v > 0) glitchUserVisible = true;
       if (glitchMesh && glitchCubes) {
-        glitchMesh.count = Math.max(1, Math.min(glitchCubes.length, Math.floor(glitchCubes.length * v)));
+        const targetCount = Math.max(0, Math.min(glitchCubes.length, Math.round(glitchCubes.length * v)));
+        glitchMesh.count = targetCount;
+        glitchMesh.visible = glitchUserVisible && targetCount > 0;
         glitchMesh.instanceMatrix.needsUpdate = true;
       }
+      glitchNeedsStaticUpdate = true;
     },
-    setGlitchJitterScale: (v) => { glitchAnimConfig.jitterScale = v; },
+    setGlitchJitterScale: (v) => { glitchAnimConfig.jitterScale = v; glitchNeedsStaticUpdate = true; },
+    setGlitchVisible: (visible) => {
+      glitchUserVisible = visible;
+      if (glitchMesh && glitchCubes) {
+        glitchMesh.visible = glitchUserVisible && glitchMesh.count > 0;
+      }
+    },
+    isGlitchVisible: () => glitchUserVisible && !!glitchMesh && glitchMesh.visible && glitchMesh.count > 0,
     dispose: () => {
       scene.remove(buildingMesh, glitchMesh, lineView, heatmapView, slopeView, sparseDotView);
       terrainMesh.meshes.forEach((mesh) => scene.remove(mesh));

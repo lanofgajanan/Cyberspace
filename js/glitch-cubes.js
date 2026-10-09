@@ -13,11 +13,16 @@ import { facePoint } from "./geometry.js";
 // emerging from it) and "just clear of the surface" — never floating
 // detached from the building the way an unbounded offset would.
 export function generateGlitchCubes(buildingBoxes) {
-  const cubes = [];
+  const perBuilding = [];
+  let maxPerBuilding = 0;
+
   buildingBoxes.forEach((b) => {
-    if (b.h < 3) return;
+    // Only place cubes on substantial building structures — skip skinny poles, antennas, and low slabs
+    if (b.h < 3.5 || (b.w && b.w < 1.5) || (b.d && b.d < 1.5)) return;
     // Expanded capacity (10-22 cubes per building) so user can scale density from sparse to heavy
     const count = 10 + Math.floor(randRange(0, 13));
+    if (count > maxPerBuilding) maxPerBuilding = count;
+    const buildingCubes = [];
     for (let i = 0; i < count; i++) {
       const face = Math.floor(randRange(0, 4));
       const faceLen = face < 2 ? b.w : b.d;
@@ -26,7 +31,7 @@ export function generateGlitchCubes(buildingBoxes) {
       const faceNormalOffset = (face < 2 ? b.d : b.w) / 2;
       const cubeSize = randRange(0.22, 0.52);
       const pos = facePoint(b, face, u, y, faceNormalOffset);
-      cubes.push({
+      buildingCubes.push({
         b,
         face,
         faceLen,
@@ -48,6 +53,19 @@ export function generateGlitchCubes(buildingBoxes) {
         extrudeMax: randRange(0.7, 2.0), // extrusion depth when popped out
       });
     }
+    perBuilding.push(buildingCubes);
   });
+
+  // Interleave across buildings so that scaling down count/density reduces
+  // cubes evenly across ALL buildings, instead of keeping 100% of cubes on
+  // the first N buildings and 0% on the rest.
+  const cubes = [];
+  for (let step = 0; step < maxPerBuilding; step++) {
+    for (let b = 0; b < perBuilding.length; b++) {
+      if (step < perBuilding[b].length) {
+        cubes.push(perBuilding[b][step]);
+      }
+    }
+  }
   return cubes;
 }

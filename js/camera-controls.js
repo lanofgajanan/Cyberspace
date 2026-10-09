@@ -58,7 +58,6 @@ export function createCameraControls(camera, domElement, options) {
   updateCameraPosition();
 
   function onDragStart(clientX, clientY, button = 0) {
-    if (flying) return;
     isDragging = true;
     dragButton = button;
     lastPointerX = clientX;
@@ -67,12 +66,20 @@ export function createCameraControls(camera, domElement, options) {
   }
 
   function onDragMove(clientX, clientY) {
-    if (flying || !isDragging) return;
+    if (!isDragging) return;
     const dx = clientX - lastPointerX;
     const dy = clientY - lastPointerY;
     lastPointerX = clientX;
     lastPointerY = clientY;
     lastInputTime = performance.now();
+
+    if (flying) {
+      // In fly mode, dragging allows steering view direction without locking cursor
+      yaw -= dx * FLY_SENSITIVITY * 1.6;
+      pitch -= dy * FLY_SENSITIVITY * 1.6;
+      pitch = Math.max(-1.5, Math.min(1.5, pitch));
+      return;
+    }
 
     if (dragButton === 0) {
       // Left click: orbit azimuth & polar
@@ -161,14 +168,25 @@ export function createCameraControls(camera, domElement, options) {
     flyVel.z = 0;
   }
   window.addEventListener("keydown", (e) => {
+    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT")) return;
     if (e.code === "Space") e.preventDefault(); // stop page scroll — Space is "fly up"
     keysDown[e.code] = true;
   });
   window.addEventListener("keyup", (e) => { keysDown[e.code] = false; });
   window.addEventListener("blur", clearKeys);
   document.addEventListener("visibilitychange", () => { if (document.hidden) clearKeys(); });
-  document.addEventListener("pointerlockchange", clearKeys);
-  document.addEventListener("pointerlockerror", clearKeys);
+  document.addEventListener("pointerlockchange", () => {
+    clearKeys();
+    const indicator = document.getElementById("fly-lock-indicator");
+    if (indicator) {
+      indicator.style.display = document.pointerLockElement === domElement ? "flex" : "none";
+    }
+  });
+  document.addEventListener("pointerlockerror", () => {
+    clearKeys();
+    const indicator = document.getElementById("fly-lock-indicator");
+    if (indicator) indicator.style.display = "none";
+  });
 
   // Click the canvas to lock the pointer, but only while in fly mode —
   // a normal click (e.g. starting an orbit drag) shouldn't try to lock it.
