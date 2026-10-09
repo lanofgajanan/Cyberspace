@@ -14,8 +14,8 @@
     <span class="dim" id="stats">city data: generating…</span><br/>
     <span class="dim" id="runtime-stats">FPS: -- · draw calls: -- · segments: -- · generation: --</span><br/>
     <span class="dim" id="diagnostics">status: starting</span><br/>
-    <span class="dim">drag orbit · scroll/pinch zoom · WASD pan</span><br/>
-    <span class="dim">Fly mode: click canvas to lock mouse · look to turn · WASD+Space/Shift move · Esc unlocks · Tab hides this UI</span>
+    <span class="dim">drag orbit · right-drag / middle-drag pan · scroll/pinch zoom · WASD pan</span><br/>
+    <span class="dim">Fly mode: click canvas to lock mouse · look to turn · WASD move · Space up / Ctrl down · Shift sprint · Esc unlocks · Tab hides UI</span>
   </div>
   <div id="loading" role="status" aria-live="polite">
     <div class="loading-card">
@@ -31,12 +31,13 @@
   <div id="mode-panel">
     <label for="mode-select">World profile</label>
     <select id="mode-select">
+      <option value="legacy" selected>Legacy city</option>
       <option value="megacity">Megacity profile</option>
-      <option value="legacy">Legacy city</option>
     </select>
   </div>
 
   <div id="settings-panel">
+    <div class="settings-section">Camera controls</div>
     <div class="row">
       <label>Drift speed <span id="drift-speed-slider-val">0.0015</span></label>
       <input type="range" id="drift-speed-slider" min="0.0002" max="0.006" step="0.0001" value="0.0015" />
@@ -45,6 +46,42 @@
       <label>Pan speed <span id="pan-speed-slider-val">1</span></label>
       <input type="range" id="pan-speed-slider" min="0.3" max="2.5" step="0.1" value="1" />
     </div>
+    <div class="row">
+      <label>Fly speed <span id="fly-speed-slider-val">1</span></label>
+      <input type="range" id="fly-speed-slider" min="0.3" max="3" step="0.1" value="1" />
+    </div>
+    <div class="row">
+      <label>Field of view <span id="fov-slider-val">55°</span></label>
+      <input type="range" id="fov-slider" data-fmt="deg" min="35" max="85" step="1" value="55" />
+    </div>
+    <div class="row">
+      <label>Smoothness <span id="cam-smooth-slider-val">16%</span></label>
+      <input type="range" id="cam-smooth-slider" data-fmt="pct" min="0.05" max="0.35" step="0.01" value="0.16" />
+    </div>
+
+    <div class="settings-section">Glitch cubes</div>
+    <div class="row">
+      <label>Cube count <span id="glitch-density-slider-val">65%</span></label>
+      <input type="range" id="glitch-density-slider" data-fmt="pct" min="0.1" max="1" step="0.05" value="0.65" />
+    </div>
+    <div class="row">
+      <label>Anim speed <span id="glitch-speed-slider-val">100%</span></label>
+      <input type="range" id="glitch-speed-slider" data-fmt="pct" min="0" max="3" step="0.1" value="1" />
+    </div>
+    <div class="row">
+      <label>Extrusion <span id="glitch-extrude-slider-val">100%</span></label>
+      <input type="range" id="glitch-extrude-slider" data-fmt="pct" min="0.2" max="2.5" step="0.1" value="1" />
+    </div>
+    <div class="row">
+      <label>Jitter intensity <span id="glitch-jitter-slider-val">100%</span></label>
+      <input type="range" id="glitch-jitter-slider" data-fmt="pct" min="0" max="2.5" step="0.1" value="1" />
+    </div>
+    <div class="row">
+      <label>Cube size <span id="glitch-size-slider-val">100%</span></label>
+      <input type="range" id="glitch-size-slider" data-fmt="pct" min="0.4" max="2" step="0.1" value="1" />
+    </div>
+
+    <div class="settings-section">Atmosphere</div>
     <div class="row">
       <label>Streak brightness <span id="streak-brightness-slider-val">100%</span></label>
       <input type="range" id="streak-brightness-slider" data-fmt="pct" min="0.2" max="1" step="0.05" value="1" />
@@ -56,24 +93,37 @@
   </div>
 
   <div id="btn-row">
+    <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
     <button id="drift-toggle" class="ctl-btn" type="button">Start drift</button>
     <button id="view-toggle" class="ctl-btn" type="button">Dot view</button>
     <button id="glitch-toggle" class="ctl-btn" type="button">Hide glitch cubes</button>
     <button id="settings-toggle" class="ctl-btn" type="button">⚙ Settings</button>
-    <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
-    <button id="terrain-heatmap-toggle" class="ctl-btn" type="button">Terrain heatmap</button>
-    <button id="terrain-slope-toggle" class="ctl-btn" type="button">Terrain slope</button>
+    <button id="terrain-heatmap-toggle" class="ctl-btn" type="button" hidden>Terrain heatmap</button>
+    <button id="terrain-slope-toggle" class="ctl-btn" type="button" hidden>Terrain slope</button>
   </div>
-  <details id="replay-panel">
-    <summary class="ctl-btn">Replay</summary>
-    <div class="replay-controls">
-      <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
-      <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
-      <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
-      <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
-      <input id="replay-file" type="file" accept="application/json" hidden />
-    </div>
-  </details>
+  <div id="dock-right">
+    <details id="views-panel" class="menu-panel">
+      <summary class="ctl-btn">Views</summary>
+      <div class="views-controls">
+        <button id="preset-overview" class="ctl-btn" type="button">Overview</button>
+        <button id="preset-street" class="ctl-btn" type="button">Street view</button>
+        <button id="preset-iso" class="ctl-btn" type="button">Isometric</button>
+      </div>
+    </details>
+    <details id="replay-panel" class="menu-panel">
+      <summary class="ctl-btn">Replay</summary>
+      <div class="replay-controls">
+        <div id="replay-status" class="replay-status-text">Waypoints: 0 (0.0s)</div>
+        <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
+        <button id="replay-undo" class="ctl-btn" type="button">Undo waypoint</button>
+        <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
+        <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
+        <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
+        <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
+        <input id="replay-file" type="file" accept="application/json" hidden />
+      </div>
+    </details>
+  </div>
 </div>
 
 <script>

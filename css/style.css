@@ -77,46 +77,88 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    max-width: calc(100vw - 32px);
+    max-width: calc(100vw - 230px);
   }
 
-  #replay-panel {
+  #dock-right {
     position: fixed;
     right: 16px;
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    gap: 10px;
+    z-index: 3;
+  }
+
+  .menu-panel {
+    position: relative;
     color: #4fd1ff;
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    z-index: 2;
   }
-  #replay-panel > summary {
+  .menu-panel > summary {
     list-style: none;
     display: block;
+    user-select: none;
   }
-  #replay-panel > summary::-webkit-details-marker { display: none; }
-  #replay-panel[open] > summary { background: rgba(79, 209, 255, 0.08); }
+  .menu-panel > summary::-webkit-details-marker { display: none; }
+  .menu-panel[open] > summary { background: rgba(79, 209, 255, 0.12); }
+
+  .views-controls {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 160px;
+    padding: 10px;
+    border: 1px solid #2a6a80;
+    background: rgba(5, 11, 22, 0.95);
+    box-shadow: 0 0 24px rgba(79, 209, 255, 0.12);
+  }
+  .views-controls .ctl-btn {
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+  }
+  .views-controls .ctl-btn:hover {
+    background: rgba(79, 209, 255, 0.16);
+  }
+
   .replay-controls {
     position: absolute;
     right: 0;
-    bottom: 84px;
+    bottom: calc(100% + 8px);
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 10px;
-    width: min(360px, calc(100vw - 32px));
+    width: min(340px, calc(100vw - 32px));
     padding: 12px;
     border: 1px solid #2a6a80;
     background: rgba(5, 11, 22, 0.94);
+    box-shadow: 0 0 24px rgba(79, 209, 255, 0.12);
+  }
+  .replay-status-text {
+    width: 100%;
+    color: #4fd1ff;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 2px 4px;
+    text-align: left;
+    text-shadow: 0 0 6px rgba(79, 209, 255, 0.5);
   }
 
   #settings-panel {
     position: fixed;
     bottom: calc(68px + env(safe-area-inset-bottom, 0px));
     left: 16px;
-    width: 240px;
-    max-width: calc(100vw - 32px);
-    background: rgba(5, 11, 22, 0.92);
+    width: 250px;
+    max-height: min(460px, calc(100vh - 120px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: rgba(5, 11, 22, 0.94);
     border: 1px solid #2a6a80;
     border-radius: 3px;
     padding: 14px 16px;
@@ -126,14 +168,31 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     display: none;
+    box-shadow: 0 0 24px rgba(79, 209, 255, 0.12);
+  }
+  #settings-panel::-webkit-scrollbar { width: 4px; }
+  #settings-panel::-webkit-scrollbar-track { background: rgba(5, 11, 22, 0.5); }
+  #settings-panel::-webkit-scrollbar-thumb { background: #2a6a80; border-radius: 2px; }
+  .settings-section {
+    color: #4fd1ff;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    font-weight: bold;
+    margin: 12px 0 6px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid rgba(42, 106, 128, 0.45);
+    text-shadow: 0 0 6px rgba(79, 209, 255, 0.4);
+  }
+  .settings-section:first-child {
+    margin-top: 0;
   }
   #settings-panel.open { display: block; }
-  #settings-panel .row { margin-bottom: 12px; }
+  #settings-panel .row { margin-bottom: 10px; }
   #settings-panel .row:last-child { margin-bottom: 0; }
   #settings-panel label {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     color: #8fb9c9;
   }
   #settings-panel input[type="range"] {
@@ -158,20 +217,26 @@
     #mode-panel select { margin-left: 0; padding: 5px; max-width: 170px; }
     #btn-row {
       left: 10px;
-      right: 10px;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      max-width: none;
+      max-width: calc(100vw - 165px);
       gap: 6px;
     }
     #btn-row .ctl-btn { padding: 7px 9px; font-size: 10px; }
-    #replay-panel {
+    #dock-right {
       right: 10px;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      gap: 6px;
     }
+    #dock-right .ctl-btn { padding: 7px 9px; font-size: 10px; }
+    .views-controls {
+      width: 130px;
+      gap: 4px;
+      padding: 6px;
+    }
+    .views-controls .ctl-btn { padding: 6px 8px; font-size: 10px; }
     .replay-controls {
       right: 0;
-      bottom: 84px;
-      width: min(300px, calc(100vw - 20px));
+      width: min(290px, calc(100vw - 20px));
       gap: 6px;
       padding: 8px;
     }
