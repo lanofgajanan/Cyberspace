@@ -122,6 +122,10 @@ async function selectMode(mode) {
     setLoadingProgress(78, "Building render geometry");
     cameraControls.clearReplayPose();
     document.getElementById("mode-status").textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
+    const heatmapToggle = document.getElementById("terrain-heatmap-toggle");
+    const slopeToggle = document.getElementById("terrain-slope-toggle");
+    if (heatmapToggle) heatmapToggle.hidden = mode !== "megacity";
+    if (slopeToggle) slopeToggle.hidden = mode !== "megacity";
     document.getElementById("diagnostics").textContent =
       mode === "megacity" && active.cityData.diagnostics && active.cityData.diagnostics.terrain
         ? "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)"

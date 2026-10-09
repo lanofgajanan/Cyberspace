@@ -75,13 +75,34 @@ export function wireUI(getSceneObjects, cameraControls, replay) {
     objects.scene.fog.far = 950 + (1 - v) * 4000;
   });
 
+  const viewsPanel = document.getElementById("views-panel");
+  const replayPanel = document.getElementById("replay-panel");
+
   function wirePreset(id, name) {
     const btn = document.getElementById(id);
-    if (btn) btn.addEventListener("click", () => cameraControls.applyPreset(name));
+    if (btn) {
+      btn.addEventListener("click", () => {
+        cameraControls.applyPreset(name);
+        if (viewsPanel) viewsPanel.removeAttribute("open");
+      });
+    }
   }
   wirePreset("preset-overview", "overview");
   wirePreset("preset-street", "street");
   wirePreset("preset-iso", "isometric");
+
+  if (viewsPanel && replayPanel) {
+    viewsPanel.addEventListener("toggle", () => {
+      if (viewsPanel.open) replayPanel.removeAttribute("open");
+    });
+    replayPanel.addEventListener("toggle", () => {
+      if (replayPanel.open) viewsPanel.removeAttribute("open");
+    });
+    window.addEventListener("click", (e) => {
+      if (viewsPanel.open && !viewsPanel.contains(e.target)) viewsPanel.removeAttribute("open");
+      if (replayPanel.open && !replayPanel.contains(e.target)) replayPanel.removeAttribute("open");
+    });
+  }
 
   const replayCaptureBtn = document.getElementById("replay-capture");
   const replayUndoBtn = document.getElementById("replay-undo");

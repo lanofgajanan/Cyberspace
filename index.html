@@ -60,30 +60,37 @@
   </div>
 
   <div id="btn-row">
-    <button id="preset-overview" class="ctl-btn" type="button">Overview</button>
-    <button id="preset-street" class="ctl-btn" type="button">Street view</button>
-    <button id="preset-iso" class="ctl-btn" type="button">Isometric</button>
+    <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
     <button id="drift-toggle" class="ctl-btn" type="button">Start drift</button>
     <button id="view-toggle" class="ctl-btn" type="button">Dot view</button>
     <button id="glitch-toggle" class="ctl-btn" type="button">Hide glitch cubes</button>
     <button id="settings-toggle" class="ctl-btn" type="button">⚙ Settings</button>
-    <button id="fly-toggle" class="ctl-btn" type="button">Fly mode</button>
-    <button id="terrain-heatmap-toggle" class="ctl-btn" type="button">Terrain heatmap</button>
-    <button id="terrain-slope-toggle" class="ctl-btn" type="button">Terrain slope</button>
+    <button id="terrain-heatmap-toggle" class="ctl-btn" type="button" hidden>Terrain heatmap</button>
+    <button id="terrain-slope-toggle" class="ctl-btn" type="button" hidden>Terrain slope</button>
   </div>
-  <details id="replay-panel">
-    <summary class="ctl-btn">Replay</summary>
-    <div class="replay-controls">
-      <div id="replay-status" class="replay-status-text">Waypoints: 0 (0.0s)</div>
-      <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
-      <button id="replay-undo" class="ctl-btn" type="button">Undo waypoint</button>
-      <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
-      <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
-      <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
-      <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
-      <input id="replay-file" type="file" accept="application/json" hidden />
-    </div>
-  </details>
+  <div id="dock-right">
+    <details id="views-panel" class="menu-panel">
+      <summary class="ctl-btn">Views</summary>
+      <div class="views-controls">
+        <button id="preset-overview" class="ctl-btn" type="button">Overview</button>
+        <button id="preset-street" class="ctl-btn" type="button">Street view</button>
+        <button id="preset-iso" class="ctl-btn" type="button">Isometric</button>
+      </div>
+    </details>
+    <details id="replay-panel" class="menu-panel">
+      <summary class="ctl-btn">Replay</summary>
+      <div class="replay-controls">
+        <div id="replay-status" class="replay-status-text">Waypoints: 0 (0.0s)</div>
+        <button id="replay-capture" class="ctl-btn" type="button">Capture waypoint</button>
+        <button id="replay-undo" class="ctl-btn" type="button">Undo waypoint</button>
+        <button id="replay-play" class="ctl-btn" type="button">Play replay</button>
+        <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
+        <button id="replay-export" class="ctl-btn" type="button">Export replay</button>
+        <button id="replay-import" class="ctl-btn" type="button">Import replay</button>
+        <input id="replay-file" type="file" accept="application/json" hidden />
+      </div>
+    </details>
+  </div>
 </div>
 
 <script>
