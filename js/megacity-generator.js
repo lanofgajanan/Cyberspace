@@ -243,7 +243,7 @@ export function generateMegacity(seed = 4242) {
   }
   return {
     buildingBoxes, edgeVerts, windowVerts, accentVerts, groundVerts, centerlineVerts, trafficVerts, blackwallVerts,
-    terrain, districts, shelves, connector: [], roads, CITY_RADIUS, blackwallRadius: BLACKWALL_RADIUS, blackwallHeight: BLACKWALL_HEIGHT, seed, profiles: DISTRICT_PROFILES,
+    terrain, districts, shelves, connector: [], roads, roadList: roads, CITY_RADIUS, blackwallRadius: BLACKWALL_RADIUS, blackwallHeight: BLACKWALL_HEIGHT, seed, profiles: DISTRICT_PROFILES,
     terrainEdgeVerts: terrain.edgeVerts,
     terrainEdgeColors: terrain.edgeColors,
     terrainHeatmapVerts: terrain.heatmapVerts,

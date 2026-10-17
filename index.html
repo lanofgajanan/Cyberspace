@@ -149,19 +149,15 @@
       </button>
     </div>
 
-    <!-- Hidden compatibility select for existing scripts -->
-    <select id="mode-select" hidden aria-hidden="true">
-      <option value="legacy">Legacy city</option>
-      <option value="megacity">Megacity profile</option>
-    </select>
+    <!-- Hidden compatibility select populated dynamically from js/cities/registry.js -->
+    <select id="mode-select" hidden aria-hidden="true"></select>
 
     <!-- Tab Pane 1: Scene & World Profile -->
     <div id="pane-scene" class="inspector-content-pane is-active">
       <div class="inspector__section">
         <span class="section-label">WORLD PROFILE</span>
-        <div class="segmented-control" role="group" aria-label="World profile selection">
-          <button id="btn-profile-megacity" type="button">MEGACITY</button>
-          <button id="btn-profile-legacy" class="is-active" type="button">LEGACY</button>
+        <div class="segmented-control" id="world-profile-tabs" role="group" aria-label="World profile selection">
+          <!-- Populated dynamically from js/cities/registry.js -->
         </div>
 
         <div class="world-card" id="world-card">
