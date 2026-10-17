@@ -1,4 +1,4 @@
-# Net / Cyberspace — City
+# Net / Cyberspace — City.OS
 
 A procedurally generated 3D city inspired by the **Net / Cyberspace sequences from *Cyberpunk 2077***.
 

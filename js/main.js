@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { resetSeed } from "./rng.js";
-import { generateCity } from "./city-generator.js";
-import { generateMegacity } from "./megacity-generator.js";
+import { CITIES, getCity, getDefaultCity } from "./cities/registry.js";
 import { generateGlitchCubes } from "./glitch-cubes.js";
 import { buildScene } from "./scene-builder.js";
 import { createCameraControls } from "./camera-controls.js";
@@ -27,26 +26,32 @@ canvasWrap.appendChild(renderer.domElement);
 const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 18, radius: 520, azimuth: 0.6, polar: 1.05, panLimit: 430 });
 const replay = createCameraReplay(cameraControls, scene);
 const lifecycle = createLifecycle(({ mode, onProgress }) => {
-  resetSeed(mode === "megacity" ? 4242 : 1337);
+  const city = getCity(mode);
+  if (city.seedNumber) {
+    resetSeed(city.seedNumber);
+  } else {
+    resetSeed(1337);
+  }
   let cityData;
   const generationStartedAt = performance.now();
   try {
-    cityData = mode === "megacity" ? generateMegacity(4242) : generateCity();
+    cityData = city.generate();
   } catch (error) {
-    throw Object.assign(new Error("The city generator failed while creating geometry."), { code: "E_GENERATION_FAILED", cause: error });
+    throw Object.assign(new Error(`The city generator '${city.name}' failed while creating geometry.`), { code: "E_GENERATION_FAILED", cause: error });
   }
   if (onProgress) onProgress(45, "Preparing render geometry");
   let sceneObjects;
   try {
-    const glitchCubes = mode === "megacity" ? [] : generateGlitchCubes(cityData.buildingBoxes);
-    sceneObjects = buildScene(scene, cityData, glitchCubes);
+    const glitchCubes = city.hasGlitchCubes ? generateGlitchCubes(cityData.buildingBoxes) : [];
+    const sceneOptions = { palette: city.palette, mode: city.id };
+    sceneObjects = buildScene(scene, cityData, glitchCubes, sceneOptions);
   } catch (error) {
     throw Object.assign(new Error("The renderer failed while building city geometry."), { code: "E_SCENE_BUILD_FAILED", cause: error });
   }
   const generationMs = performance.now() - generationStartedAt;
   const statsEl = document.getElementById("stats");
   if (statsEl) statsEl.textContent = cityData.stats;
-  if (mode === "megacity" && cityData.diagnostics && cityData.diagnostics.terrain) {
+  if (city.id === "megacity" && cityData.diagnostics && cityData.diagnostics.terrain) {
     const terrainCheck = cityData.diagnostics.terrain;
     const selfCheck = `PHASE 1 TERRAIN · levels ${terrainCheck.terraceLevels} · components ${terrainCheck.components} · max slope ${terrainCheck.maxSlope.toFixed(3)} · chunks ${terrainCheck.chunkCount} · camera-ground: unavailable (free camera)`;
     console.info(selfCheck, terrainCheck);
@@ -66,6 +71,7 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
     sceneObjects,
     cityData,
     generationMs,
+    city,
   };
 });
 
@@ -76,7 +82,7 @@ const loadingError = document.getElementById("loading-error");
 const loadingRetry = document.getElementById("loading-retry");
 const modeSelect = document.getElementById("mode-select");
 const progressBar = document.querySelector(".progress-track");
-let selectedMode = modeSelect ? modeSelect.value : "legacy";
+let selectedMode = modeSelect && modeSelect.value ? modeSelect.value : getDefaultCity().id;
 let loadRequest = 0;
 
 function setLoadingProgress(value, status) {
@@ -107,8 +113,12 @@ function getErrorDetails(error, fallbackCode) {
 
 async function selectMode(mode) {
   const request = ++loadRequest;
-  selectedMode = mode;
-  if (modeSelect) modeSelect.disabled = true;
+  const city = getCity(mode);
+  selectedMode = city.id;
+  if (modeSelect) {
+    modeSelect.value = city.id;
+    modeSelect.disabled = true;
+  }
   if (loading) {
     loading.hidden = false;
     loading.classList.remove("is-hidden");
@@ -119,11 +129,11 @@ async function selectMode(mode) {
   await nextFrame();
   if (request !== loadRequest) return;
   try {
-    setLoadingProgress(20, mode === "megacity" ? "Seeding megacity districts" : "Seeding legacy road network");
+    setLoadingProgress(20, city.loadingMessage || "Generating city geometry");
     await nextFrame();
     if (request !== loadRequest) return;
     setLoadingProgress(35, "Generating city geometry");
-    const active = lifecycle.init({ mode, onProgress: setLoadingProgress });
+    const active = lifecycle.init({ mode: city.id, onProgress: setLoadingProgress });
     if (!active || !active.cityData) {
       throw Object.assign(new Error("Generator returned no city data."), { code: "E_GENERATION_EMPTY" });
     }
@@ -134,28 +144,27 @@ async function selectMode(mode) {
       ui.syncSceneSettings(active.sceneObjects);
     }
     if (ui && ui.syncWorldProfileUI) {
-      ui.syncWorldProfileUI(mode);
+      ui.syncWorldProfileUI(city.id);
     }
     const modeStatusEl = document.getElementById("mode-status");
-    if (modeStatusEl) modeStatusEl.textContent = mode === "megacity" ? "megacity / full scale" : "legacy city";
+    if (modeStatusEl) {
+      modeStatusEl.textContent = `${city.id} city`;
+    }
 
     const diagEl = document.getElementById("diagnostics");
     if (diagEl) {
-      diagEl.textContent =
-        mode === "megacity" && active.cityData.diagnostics && active.cityData.diagnostics.terrain
-          ? "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)"
-          : `status: ready · seed ${active.cityData.seed || "runtime"} · ${Math.round(active.generationMs)}ms · dense dots deferred`;
+      if (city.id === "megacity" && active.cityData.diagnostics && active.cityData.diagnostics.terrain) {
+        diagEl.textContent = "status: ready · Phase 1 terrain self-check emitted · camera-ground unavailable (free camera)";
+      } else {
+        const seedStr = city.seed === "AUTHORED" ? "authored axial" : `seed ${active.cityData.seed || city.seed}`;
+        diagEl.textContent = `status: ready · ${seedStr} · ${Math.round(active.generationMs)}ms`;
+      }
     }
 
     // Update World Card counts
     const chunksEl = document.getElementById("world-card-chunks");
     if (chunksEl) {
-      if (mode === "megacity") {
-        chunksEl.textContent = "06 / 06";
-      } else {
-        const blkCount = active.cityData.blocks ? active.cityData.blocks.length : 18;
-        chunksEl.textContent = `${blkCount} blk`;
-      }
+      chunksEl.textContent = city.chunks || "01 / 01";
     }
 
     setLoadingProgress(100, "City ready");

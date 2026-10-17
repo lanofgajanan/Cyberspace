@@ -1,3 +1,5 @@
+import { CITIES, getCity } from "./cities/registry.js";
+
 export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer) {
   const getObjects = () => getSceneObjects() || {};
 
@@ -94,11 +96,11 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   }
 
   // =========================================================================
-  // 2. World Profile Switcher (Segmented Control + Card)
+  // 2. World Profile Switcher (Dynamic Segmented Control + Card)
   // =========================================================================
   const modeSelect = document.getElementById("mode-select");
-  const btnMegacity = document.getElementById("btn-profile-megacity");
-  const btnLegacy = document.getElementById("btn-profile-legacy");
+  const segmentedControl = document.querySelector("#pane-scene .segmented-control");
+  const worldCardIndex = document.getElementById("world-card-index");
   const worldCardSubtitle = document.getElementById("world-card-subtitle");
   const worldCardDesc = document.getElementById("world-card-desc");
   const worldCardSeed = document.getElementById("world-card-seed");
@@ -106,58 +108,63 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   const topbarSeed = document.getElementById("topbar-seed-indicator");
   const topbarStatus = document.getElementById("topbar-status-text");
 
-  function syncWorldProfileUI(mode) {
-    const isMegacity = mode === "megacity";
-    if (btnMegacity) btnMegacity.classList.toggle("is-active", isMegacity);
-    if (btnLegacy) btnLegacy.classList.toggle("is-active", !isMegacity);
+  // Dynamically populate select dropdown and segmented control from CITIES registry
+  if (modeSelect) {
+    modeSelect.innerHTML = "";
+    CITIES.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      modeSelect.appendChild(opt);
+    });
+  }
 
-    if (worldCardSubtitle) {
-      worldCardSubtitle.textContent = isMegacity ? "VERTICAL SLICE" : "PROCEDURAL CITY";
-    }
-    if (worldCardDesc) {
-      worldCardDesc.textContent = isMegacity
-        ? "Terraced City Center & Blackwall"
-        : "Rotated Downtown Grid & Buildings";
-    }
-    if (worldCardSeed) {
-      worldCardSeed.textContent = isMegacity ? "4242" : "1337";
-    }
-    if (worldCardChunks) {
-      worldCardChunks.textContent = isMegacity ? "06 / 06" : "18 / 18";
-    }
-    if (topbarSeed) {
-      topbarSeed.textContent = isMegacity ? "SEED 4242" : "SEED 1337";
-    }
-    if (topbarStatus) {
-      topbarStatus.textContent = isMegacity ? "MEGACITY ONLINE" : "WORLD ONLINE";
-    }
+  if (segmentedControl) {
+    segmentedControl.innerHTML = "";
+    CITIES.forEach((c, index) => {
+      const btn = document.createElement("button");
+      btn.id = `btn-profile-${c.id}`;
+      btn.type = "button";
+      btn.textContent = c.shortName || c.name.toUpperCase();
+      btn.setAttribute("aria-label", `Switch to ${c.name}`);
+      if (index === 0) btn.classList.add("is-active");
+      btn.addEventListener("click", () => {
+        if (modeSelect && modeSelect.value !== c.id) {
+          modeSelect.value = c.id;
+          modeSelect.dispatchEvent(new Event("change"));
+        }
+      });
+      segmentedControl.appendChild(btn);
+    });
+  }
+
+  function syncWorldProfileUI(mode) {
+    const city = getCity(mode);
+
+    CITIES.forEach((c) => {
+      const btn = document.getElementById(`btn-profile-${c.id}`);
+      if (btn) {
+        const active = c.id === city.id;
+        btn.classList.toggle("is-active", active);
+        if (active) btn.setAttribute("aria-selected", "true");
+        else btn.removeAttribute("aria-selected");
+      }
+    });
+
+    if (worldCardIndex) worldCardIndex.textContent = city.badge || "01";
+    if (worldCardSubtitle) worldCardSubtitle.textContent = city.kicker || "PROCEDURAL CITY";
+    if (worldCardDesc) worldCardDesc.textContent = city.description || "";
+    if (worldCardSeed) worldCardSeed.textContent = city.seed || "1337";
+    if (worldCardChunks) worldCardChunks.textContent = city.chunks || "01 / 01";
+    if (topbarSeed) topbarSeed.textContent = city.seed === "AUTHORED" ? "AUTHORED" : `SEED ${city.seed}`;
+    if (topbarStatus) topbarStatus.textContent = city.status || "WORLD ONLINE";
 
     // Update relevant tab visibility hints
     const glitchRail = document.getElementById("rail-glitch");
     if (glitchRail) {
-      glitchRail.style.opacity = isMegacity ? "0.45" : "1.0";
-      glitchRail.title = isMegacity ? "Glitch Cubes (Legacy profile only)" : "Glitch Cubes Tuner";
+      glitchRail.style.opacity = city.hasGlitchCubes ? "1.0" : "0.45";
+      glitchRail.title = city.hasGlitchCubes ? "Glitch Cubes Tuner" : "Glitch Cubes (Legacy profile only)";
     }
-  }
-
-  if (btnMegacity) {
-    btnMegacity.addEventListener("click", () => {
-      if (modeSelect && modeSelect.value !== "megacity") {
-        modeSelect.value = "megacity";
-        modeSelect.dispatchEvent(new Event("change"));
-        syncWorldProfileUI("megacity");
-      }
-    });
-  }
-
-  if (btnLegacy) {
-    btnLegacy.addEventListener("click", () => {
-      if (modeSelect && modeSelect.value !== "legacy") {
-        modeSelect.value = "legacy";
-        modeSelect.dispatchEvent(new Event("change"));
-        syncWorldProfileUI("legacy");
-      }
-    });
   }
 
   // =========================================================================

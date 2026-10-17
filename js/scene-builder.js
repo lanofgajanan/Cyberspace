@@ -33,11 +33,11 @@ function pseudoNoise(seed, step) {
   return n - Math.floor(n);
 }
 
-function buildGlitchMesh(glitchCubes, initialDensity = 0.65) {
+function buildGlitchMesh(glitchCubes, initialDensity = 0.65, edgeColor = EDGE_COLOR) {
   if (!glitchCubes || glitchCubes.length === 0) {
     const mesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({ color: EDGE_COLOR, fog: true }),
+      new THREE.MeshBasicMaterial({ color: edgeColor, fog: true }),
       1
     );
     mesh.count = 0;
@@ -48,7 +48,7 @@ function buildGlitchMesh(glitchCubes, initialDensity = 0.65) {
   }
   const mesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ color: EDGE_COLOR, fog: true }),
+    new THREE.MeshBasicMaterial({ color: edgeColor, fog: true }),
     glitchCubes.length
   );
   glitchCubes.forEach((g, i) => {
@@ -88,21 +88,28 @@ function buildTerrainMesh(terrain) {
 // can be computed ONCE per vertex at build time instead (standard alpha
 // compositing: result = alpha*fg + (1-alpha)*bg, per channel) and baked
 // straight into an opaque vertex color.
-function buildMergedLineData(cityData) {
+function buildMergedLineData(cityData, palette = {}) {
+  const edgeColor = palette.edge ?? EDGE_COLOR;
+  const windowColor = palette.window ?? WINDOW_COLOR;
+  const accentColor = palette.accent ?? ACCENT_COLOR;
+  const groundColor = palette.ground ?? GROUND_COLOR;
+  const centerlineColor = palette.centerline ?? GROUND_COLOR;
+
   const positions = [];
   const colors = [];
   function appendLayer(verts, hex, alpha) {
+    if (!verts || verts.length === 0) return;
     const rgb = blendedColor(hex, alpha);
     for (let i = 0; i < verts.length; i += 3) {
       positions.push(verts[i], verts[i + 1], verts[i + 2]);
       colors.push(rgb[0], rgb[1], rgb[2]);
     }
   }
-  appendLayer(cityData.edgeVerts, EDGE_COLOR, 0.9);
-  appendLayer(cityData.windowVerts, WINDOW_COLOR, 0.7);
-  appendLayer(cityData.accentVerts, ACCENT_COLOR, 1);
-  appendLayer(cityData.groundVerts, GROUND_COLOR, 0.8);
-  appendLayer(cityData.centerlineVerts, GROUND_COLOR, 0.45);
+  appendLayer(cityData.edgeVerts, edgeColor, 0.9);
+  appendLayer(cityData.windowVerts, windowColor, 0.7);
+  appendLayer(cityData.accentVerts, accentColor, 1);
+  appendLayer(cityData.groundVerts, groundColor, 0.8);
+  appendLayer(cityData.centerlineVerts, centerlineColor, 0.45);
   if (cityData.terrainEdgeVerts) {
     for (let i = 0; i < cityData.terrainEdgeVerts.length; i += 3) {
       positions.push(cityData.terrainEdgeVerts[i], cityData.terrainEdgeVerts[i + 1], cityData.terrainEdgeVerts[i + 2]);
@@ -138,20 +145,21 @@ function makeTrafficLine(verts) {
 // Total draw calls: 2 instanced meshes (buildings + glitch cubes) + line
 // view + sparse streaks + dense streaks (only 2 of those 3 ever visible
 // at once) = up to 4, regardless of city size.
-export function buildScene(scene, cityData, glitchCubes) {
+export function buildScene(scene, cityData, glitchCubes, options = {}) {
+  const palette = Object.assign({}, cityData.palette, options.palette);
   scene.background = new THREE.Color(BG_COLOR);
   scene.fog = new THREE.Fog(BG_COLOR, 260, 3600);
 
   const buildingMesh = buildBuildingMesh(cityData.buildingBoxes);
   scene.add(buildingMesh);
 
-  const glitchMesh = buildGlitchMesh(glitchCubes);
+  const glitchMesh = buildGlitchMesh(glitchCubes, 0.65, palette.edge ?? EDGE_COLOR);
   scene.add(glitchMesh);
 
   const terrainMesh = buildTerrainMesh(cityData.terrain);
   terrainMesh.meshes.forEach((mesh) => scene.add(mesh));
 
-  const { positions: mergedPositions, colors: mergedColors } = buildMergedLineData(cityData);
+  const { positions: mergedPositions, colors: mergedColors } = buildMergedLineData(cityData, palette);
   const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, fog: true });
   const lineView = makeLineSegments(mergedPositions, mergedColors, lineMat);
   scene.add(lineView);

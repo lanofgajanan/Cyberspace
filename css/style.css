@@ -514,8 +514,9 @@ select:focus-visible {
 
 /* Segmented Control */
 .segmented-control {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
   margin-top: 12px;
   padding: 3px;
   background: rgba(255, 255, 255, 0.03);
@@ -523,6 +524,8 @@ select:focus-visible {
 }
 
 .segmented-control button {
+  flex: 1 1 0;
+  min-width: 60px;
   height: 30px;
   color: var(--dim);
   font: 500 9px var(--mono);
