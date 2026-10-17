@@ -1,224 +1,559 @@
 # Net / Cyberspace — City.OS
 
-A procedurally generated 3D city visualizer inspired by the **Net / Cyberspace sequences from *Cyberpunk 2077***.
+A procedurally generated 3D city inspired by the **Net / Cyberspace sequences from *Cyberpunk 2077***.
 
-The scene uses a monochrome **solid-geometry + glowing-edge** vector aesthetic. Roads grow organically outward from a rotated downtown grid or follow rigid monumental axes, buildings orient toward the streets they front, and visual density transitions from towering stepped monoliths to low-profile structures at the rim.
+The scene uses a monochrome **solid-geometry + glowing-edge** visual style. Roads grow organically outward from a rotated downtown grid, buildings orient themselves toward the streets they front, and building density transitions from tall stepped towers around the center to smaller structures toward the edges.
 
-The project is built around procedural generation, deterministic world states, custom camera controls, single-draw-call rendering, and an explicit scene lifecycle.
+The project is built around procedural generation, deterministic world states, custom camera controls, GPU-conscious rendering, and an explicit scene lifecycle.
 
 ---
 
 ## Preview
 
-<img src="image1" alt="Net / Cyberspace City Overview">
+<img src="image1" alt="Net / Cyberspace City">
 
-<img src="image2" alt="Net / Cyberspace City Street Level">
+<img src="image2" alt="Net / Cyberspace City">
 
-<img src="image3" alt="Net / Cyberspace City Isometric View">
+<img src="image3" alt="Net / Cyberspace City">
 
 ---
 
 ## Running Locally
 
-This project uses native ES modules (`import` / `export`), which browsers refuse to load over the `file://` protocol for security reasons — a local HTTP server is required.
+This project uses real ES modules (`import` / `export`), which browsers will not load from `file://` because of module and CORS security restrictions.
+
+A local HTTP server is therefore required.
 
 ### Using `npx`
+
 ```bash
 npx serve .
 ```
 
 ### Using Python
+
 ```bash
 python3 -m http.server
 ```
 
-Then open the `localhost` URL printed in the terminal.
+Then open the `localhost` URL printed by the server.
 
-> **Important:** Opening `index.html` directly by double-clicking it will **not work**; browser CORS rules will block ES module imports.
+### Important
 
-### Zero-Build Deployment
-There is no bundler, no `npm install`, and nothing to compile. The only external runtime dependency is **Three.js**, loaded directly through the browser import map in `index.html` from a CDN. The project can be deployed immediately to GitHub Pages or any static host.
+Opening `index.html` directly by double-clicking it will **not work**.
 
----
+The browser will block the ES modules and the result will usually be a blank page accompanied by CORS or module-loading errors in the console.
 
-## World Profiles
+There is otherwise no build pipeline:
 
-Cyberspace features three distinct procedural city architectures:
+* No bundler
+* No `npm install`
+* No compilation step
+* No framework
+* No build configuration
 
-### 1. Legacy City (`legacy`)
-- **Character:** Organic, grown, emergent.
-- **Layout:** Roads grow outward from a rotated downtown grid using wandering streamlines; buildings orient to whichever street they front; density tapers from tall stepped towers downtown to mid-rise slabs and houses near the edges.
-- **Non-overlap:** Spatial hash reservations for parks and hospitals, growth-time collision detection, and radial rejection sampling for frontage lots.
+The only external dependency is **Three.js**, loaded through the import map in `index.html` from a CDN.
 
-### 2. Megacity — Vertical Slice (`megacity`)
-- **Character:** High-density terraced center.
-- **Layout:** Six terraced elevation shelves, the authored City Center, animated traffic flow lines, and the red-edged Blackwall containment perimeter.
-- **Diagnostics:** Seeded terrain state, chunk readiness, and slope analysis.
-
-### 3. Soviet Brutalist City (`soviet`)
-- **Character:** Monumental, axial, rigid, perfectly symmetric.
-- **Layout:** Authored coordinate tables with zero randomness. A monumental central axis features the stepped House of Soviets monolith, Red Star obelisks, central civic square, 6-lane prospekt, river bridge, and monument roundabout with a colossal statue and colonnade. Flanked by 8 showpiece towers, residential microraion superblocks, an industrial belt with wireframe cooling towers, and a fenced perimeter ring road with watchtowers.
-- **Palette:** Cold pale grey edges and window matrices with signature crimson red accents on civic monuments, spires, and chimney bands.
+The project can therefore be deployed directly to GitHub Pages or another static host.
 
 ---
 
-## Cities Architecture & Adding New Cities
+# World Modes
 
-The codebase features a modular, plug-and-play **Cities Subsystem** in `js/cities/`.
+The project currently has three world profiles.
 
-Adding a new city requires **zero edits to HTML, CSS, or UI code**:
+### Legacy City
 
-```
-Step 1: Copy `js/cities/template.js` -> `js/cities/<your-city>.js`
-Step 2: Implement your generation function returning the standard CityData contract.
-Step 3: Register it in `js/cities/registry.js` (add 1 import + add to `CITIES`).
-Step 4: Validate in terminal:
-          node js/cities/validate.js <your-city-id>
-```
+The original procedural city generator.
 
-The engine automatically:
-- Generates the segmented control button in the UI tool rail.
-- Adds an option to the mode select dropdown.
-- Sets up the World Card badge, kicker, description, seed, and block counts.
-- Applies custom per-world color palettes (edges, windows, accents, ground, centerlines).
-- Manages GPU object lifecycle and memory cleanup on world switching.
+It generates the city from the procedural road, block and building systems, including the rotated downtown grid and density falloff toward the outskirts.
 
-### Automated CLI Validation Suite
+### Megacity — Vertical Slice
 
-Any city's math, vertex buffers, and collision bounds can be tested in Node without opening a browser:
+A deterministic, terrain-first vertical slice intended as the foundation for the larger megacity.
 
-```bash
-# Test a specific city:
-node js/cities/validate.js soviet
-node js/cities/validate.js legacy
-node js/cities/validate.js megacity
+It currently contains:
 
-# Test all registered cities:
-node js/cities/validate.js all
-```
+* Six terraced terrain shelves
+* An authored City Center
+* Animated center traffic lines
+* The red-edged Blackwall boundary
+* Seeded terrain generation
+* Chunk / worker readiness diagnostics
+* Generation state reporting
 
-The validator checks:
-1. **Execution**: Verifies the generator completes without errors.
-2. **Buffer Integrity**: Confirms all vertex arrays are divisible by 6 (`length % 6 === 0`) and contain only finite floats.
-3. **Bounding Extent**: Checks that all solid corners fall within `CITY_RADIUS`.
-4. **Collision Detection**: Performs 3D AABB overlap tests across all axis-aligned solids.
+The older outer districts are intentionally absent while they're being rebuilt, and Phase 2 roads are not currently active.
+
+### Soviet Brutalist City
+
+An authored, axial, and symmetric city generator with zero randomness.
+
+It features:
+
+* A monumental central axis: stepped House of Soviets monolith, Red Star obelisks, central civic square, 6-lane prospekt, river bridge, and monument roundabout with a colossal statue and colonnade
+* Eight showpiece towers (tiered with spires or concrete ziggurats)
+* Residential microraion superblocks with schools, shops, and kindergartens
+* Industrial belt with wireframe cooling towers, factories, and chimneys
+* Fenced perimeter ring road with radial watchtowers
+* Cold pale grey edge/window palette with signature crimson red accents
 
 ---
 
-## Architecture & Data Flow
+# World Lifecycle
 
-The project strictly separates **world generation** from **rendering**:
+All world profiles implement the same lifecycle:
 
-> **Generation produces data. Rendering consumes data.**
-
-<img src="diagram.png" alt="Architecture and file relationships diagram">
-
-### Generation Pipeline
-```text
-Seed / Layout Tables
-        │
-        ▼
-Coordinate Frame (frame.js)
-        │
-        ▼
-Road Network & Arterials
-        │
-        ├──► Spatial Hash (spatial-hash.js)
-        │
-        ▼
-Superblocks & Lots
-        │
-        ├──► Road Orientation
-        └──► Reserved Sites (civic core, parks, hospitals)
-        │
-        ▼
-Plain Generated Data Contract
-        │
-        ▼
-Three.js Scene Construction (scene-builder.js)
-```
-
-Generators return plain JavaScript arrays of numbers (`buildingBoxes`, `edgeVerts`, `windowVerts`, `accentVerts`, `groundVerts`, `centerlineVerts`). Only `scene-builder.js` creates Three.js meshes and line segments.
-
----
-
-## File Structure
-
-```text
-index.html                  Markup, layout, styles link, import map, loads js/main.js
-css/style.css                All styling (responsive HUD, tool rail, inspector, world card)
-js/
-  cities/                    Pluggable Cities Subsystem
-    registry.js              Central registry of all cities (drives menus & lifecycles)
-    template.js              Starter boilerplate template for new cities
-    validate.js              Node CLI test suite (vertex integrity, bounds, collisions)
-    legacy.js                Legacy organic city generator & profile
-    megacity.js              Megacity vertical slice generator & profile
-    soviet.js                Soviet brutalist axial generator & profile
-  geometry.js                Line segment pushers, box corners, face-local points
-  frame.js                   Local coordinate frame translation & rotation
-  rng.js                     Seeded pseudo-random number generator
-  spatial-hash.js            2D spatial hash for proximity and clearance queries
-  colors.js                  Color constants, palette definitions, alpha-compositing blend
-  scene-builder.js           GPU scene constructor (instanced meshes, merged line batches)
-  glitch-cubes.js            Extruding facade voxel packets
-  streaks.js                 Converts line/fill data into cyberpunk matrix dot streaks
-  camera-controls.js         Hand-rolled orbit, pan, and first-person fly camera controls
-  camera-replay.js           Waypoint capture, quaternion slerp, and route playback
-  ui.js                      Dynamic inspector tabs, segmented controls, telemetry, and HUD
-  main.js                    Entry point, loop, telemetry, and staged loading coordinator
-  lifecycle.js               Explicit init/update/dispose mode shell
-  SKILL.md                   Comprehensive architecture and engineering guide for devs & AI
-```
-
----
-
-## World Lifecycle
-
-All world profiles implement a unified lifecycle:
-
-```javascript
+```js
 init(ctx)
 update(dt)
 dispose()
 ```
 
-Switching profiles explicitly disposes of geometries, instanced matrices, and materials rather than simply replacing scene references, preventing GPU memory leaks across re-generations.
+This gives the application a common interface regardless of which world is active.
+
+More importantly, switching profiles explicitly disposes of the previous world rather than simply replacing the scene reference.
+
+That means GPU resources associated with the previous world can be released during a mode switch instead of accumulating across generations.
+
+The lifecycle shell is handled by:
+
+```text
+js/lifecycle.js
+```
+
+while the application-level coordination happens through:
+
+```text
+js/main.js
+```
 
 ---
 
-## Rendering & Performance
+# Cities Subsystem (`js/cities/`)
 
-- **One Instanced Mesh for all solids:** All building boxes render as a single `THREE.InstancedMesh` (one draw call for the entire city, regardless of building count).
-- **Baked Vertex Alpha Compositing:** Edge, window, accent, ground, and centerline layers are merged into a single `THREE.LineSegments` draw call. Layer alpha blending is precomputed once at build time into vertex colors (`blendedColor(hex, alpha)`), avoiding per-frame GPU blending passes.
-- **Draw Call Efficiency:** Total draw calls typically stay between 2 and 4, ensuring smooth 60 FPS performance on lower-end devices.
+Cities are organized in `js/cities/` and registered in `js/cities/registry.js`.
 
----
+The UI (segmented controls and select dropdown), World Card metadata, telemetry, and per-world color palettes are generated dynamically from this registry.
 
-## Camera Navigation & Replay
+### Adding a New City
 
-### Camera Controls
-- **Orbit Mode:** Left-click drag to rotate · Right-click or Middle-click drag to pan · Scroll wheel to zoom · W/A/S/D to pan.
-- **Fly Mode:** Click canvas to lock mouse · Mouse look to steer · W/S/A/D to move · Space for up · Ctrl for down · Shift to sprint · Esc to exit cursor lock.
-- **Interface:** Press `Tab` to toggle HUD on/off · Press `H` to toggle the navigation help modal.
+Adding a new procedural city requires no changes to HTML, CSS, or UI code:
 
-### Camera Replay System
-- Capture waypoints along camera routes.
-- Path positions interpolate with **per-segment Hermite timing**, while orientations interpolate with **quaternion slerp**.
-- Supports route export/import as validated JSON.
+1. Copy `js/cities/template.js` to `js/cities/<your-city>.js`.
+2. Implement the generator returning the standard data contract (`buildingBoxes`, `edgeVerts`, `windowVerts`, `accentVerts`, `groundVerts`, `centerlineVerts`, `roadList`).
+3. Register it in `js/cities/registry.js` by importing and adding it to `CITIES`.
+4. Validate in terminal:
+   ```bash
+   node js/cities/validate.js <your-city-id>
+   ```
 
 ---
 
-## Current Status & Roadmap
+# Procedural Generation
 
-- [x] Organic legacy city generator with rotated downtown grid
-- [x] Terraced Megacity vertical slice with Blackwall perimeter
-- [x] Authored Soviet Brutalist city generator with custom palette
-- [x] Modular `js/cities/` architecture with dynamic menu generation
-- [x] Standalone Node CLI validation test suite (`validate.js`)
-- [x] Camera waypoint recording and replay timeline
-- [ ] Post-processing bloom pass (`EffectComposer` + `UnrealBloomPass`)
-- [ ] Additional city architectures and road hierarchy phases
+The original city is generated through several interdependent systems.
+
+At a high level:
+
+```text
+Seed
+ │
+ ▼
+Coordinate Frame
+ │
+ ▼
+Road Growth
+ │
+ ├──► Spatial Hash
+ │
+ ▼
+Blocks
+ │
+ ▼
+Building Placement
+ │
+ ├──► Road Orientation
+ ├──► Spatial Hash
+ └──► Reserved Sites
+       │
+       ├── Parks
+       └── Hospitals
+ │
+ ▼
+Plain Generated Data
+ │
+ ▼
+Three.js Scene Construction
+```
+
+The generator does **not** directly create Three.js objects.
+
+`city-generator.js` produces plain generated data, which is then consumed by `scene-builder.js`.
+
+This keeps the procedural logic independent from the rendering implementation.
+
+---
+
+# Road Generation
+
+Roads grow outward from a rotated downtown grid rather than being generated as a simple axis-aligned grid.
+
+The road system maintains spatial information about existing geometry so new segments can query their surroundings efficiently.
+
+This is handled through:
+
+```text
+js/spatial-hash.js
+```
+
+The spatial hash is used during both:
+
+* Road growth
+* Building placement
+
+This avoids repeatedly checking every existing road/building against every new candidate.
+
+The coordinate system is also abstracted through:
+
+```text
+js/frame.js
+```
+
+which provides a local coordinate frame so the same generation logic can operate at arbitrary positions and rotations.
+
+---
+
+# Building Generation
+
+Buildings are generated from the resulting road and block layout.
+
+A building doesn't simply get placed at an arbitrary angle.
+
+Its orientation is determined from the street it fronts, allowing the generated architecture to follow the road network.
+
+The generator also reserves specific sites before road growth.
+
+For example:
+
+```text
+Reserve landmark
+       ↓
+Road generation
+       ↓
+Roads route around reserved area
+       ↓
+Block generation
+       ↓
+Building placement
+```
+
+This allows features such as parks and hospitals to influence the surrounding road network rather than being placed after the fact.
+
+---
+
+## Architecture
+
+The project deliberately separates **world generation** from **rendering**.
+
+The project structure and module relationships are visualized in the generated GitDiagram below.
+
+<img src="diagram.png" alt="GitDiagram showing the project architecture and file relationships">
+
+
+The important boundary is:
+
+> **Generation produces data. Rendering consumes data.**
+
+`city-generator.js` contains no Three.js dependency.
+
+`scene-builder.js` is responsible for turning the generated data into actual GPU-backed Three.js objects.
+
+In principle, this means the procedural generation system could be connected to another renderer without rewriting the generation algorithms themselves.
+
+---
+
+# File Structure
+
+```text
+index.html
+└── Markup, stylesheet link, import map and application entry
+
+css/
+└── style.css
+    └── HUD, buttons and settings panel
+
+js/
+├── cities/
+│   ├── registry.js
+│   │   └── Central city registry driving dynamic UI and lifecycles
+│   ├── template.js
+│   │   └── Starter template for new city generators
+│   ├── validate.js
+│   │   └── Standalone Node CLI validation suite
+│   ├── legacy.js
+│   │   └── Legacy procedural city profile
+│   ├── megacity.js
+│   │   └── Megacity vertical slice profile
+│   └── soviet.js
+│       └── Soviet Brutalist city generator and profile
+│
+├── rng.js
+│   └── Seeded random number generator
+│
+├── colors.js
+│   └── Color constants + alpha-compositing blend helper
+│
+├── frame.js
+│   └── Local coordinate frame for position / rotation independent generation
+│
+├── geometry.js
+│   └── Pure geometry helpers:
+│       box corners, face-local points and line-segment collectors
+│
+├── spatial-hash.js
+│   └── Fast proximity queries used by road growth and building placement
+│
+├── city-generator.js
+│   └── Core procedural generator:
+│       roads, blocks and buildings
+│       Returns plain data — no Three.js (re-exports from js/cities/legacy.js)
+│
+├── soviet-generator.js
+│   └── Re-export for backward compatibility
+│
+├── glitch-cubes.js
+│   └── Small cubes protruding from building walls
+│       Currently an experimental / WIP effect
+│
+├── streaks.js
+│   └── Converts line/fill data into vertical streak
+│       dot-shader visuals
+│
+├── scene-builder.js
+│   └── Converts generated data into Three.js GPU objects
+│       using instanced meshes and merged line batches
+│
+├── camera-controls.js
+│   └── Hand-written orbit / pan / fly camera controls
+│       No external OrbitControls dependency
+│
+├── camera-replay.js
+│   └── Camera waypoint capture, validation and playback
+│
+├── ui.js
+│   └── HUD buttons, dynamic world profile selector and settings controls
+│
+├── lifecycle.js
+│   └── Explicit init / update / dispose world lifecycle
+│
+├── megacity-generator.js
+│   └── Seeded terrace + vertical-slice generator
+│
+├── SKILL.md
+│   └── Comprehensive architecture and engineering guide for devs & AI
+│
+└── main.js
+    └── Application entry point and system coordination
+```
+
+---
+
+# Why `city-generator.js` Is One Large File
+
+`city-generator.js` is intentionally not split into many smaller modules.
+
+The reason is that road growth, block placement and building generation are genuinely interdependent.
+
+For example:
+
+* Buildings need road information to avoid overlaps.
+* Buildings need road information to orient themselves toward the correct street.
+* Parks and hospitals must be reserved before roads grow so roads can route around them.
+* Road growth and building placement both rely on the same spatial hashes.
+* The generator uses a shared coordinate frame across these systems.
+
+Splitting these pieces further would require threading the same state through numerous function boundaries without providing a meaningful improvement in readability.
+
+The current split therefore follows **actual system boundaries**, rather than simply trying to make every file smaller.
+
+---
+
+# Camera Replay
+
+The replay system records camera waypoints and reconstructs the camera path during playback.
+
+Position interpolation uses **per-segment Hermite timing**, while camera orientation uses **quaternion slerp**.
+
+Conceptually:
+
+```text
+Waypoint A
+    │
+    │ Hermite interpolation
+    ▼
+Waypoint B
+    │
+    │ Hermite interpolation
+    ▼
+Waypoint C
+```
+
+Orientation is interpolated independently using quaternion spherical linear interpolation.
+
+Replay data can also be exported and imported as JSON.
+
+Imported replay data is validated before being accepted.
+
+During playback:
+
+```text
+Normal Camera Controls
+        │
+        ▼
+   Replay Starts
+        │
+        ▼
+ Replay Owns Camera
+        │
+        ▼
+ Replay Stops
+        │
+        ▼
+Normal Camera Controls
+```
+
+Stopping a replay therefore returns control to the normal orbit/fly camera rather than leaving the camera in a replay-controlled state.
+
+---
+
+# Runtime Diagnostics
+
+The HUD exposes several runtime values:
+
+* FPS
+* Renderer draw calls
+* Road segment count
+* Generation time
+* Chunk readiness
+* Worker readiness
+* Seeded terrain state
+
+Generation is also staged during mode changes.
+
+If generation or scene setup fails, the selected world profile remains recoverable through the retry flow.
+
+User-facing failures use stable error codes, including:
+
+```text
+E_GENERATION_FAILED
+E_SCENE_BUILD_FAILED
+E_REPLAY_IMPORT_INVALID
+```
+
+Stable error identifiers make failures easier to diagnose than relying only on free-form error messages.
+
+---
+
+# Rendering & Performance
+
+A major goal of the renderer is to keep draw-call overhead low as the procedural city grows.
+
+All building solids are rendered using a single:
+
+```js
+THREE.InstancedMesh
+```
+
+This allows the building geometry to be rendered as instances rather than requiring an individual draw call per building.
+
+Edge, window, road and streak geometry is similarly combined into a small number of `LineSegments` batches.
+
+Conceptually:
+
+```text
+Many Buildings
+      │
+      ▼
+InstancedMesh
+      │
+      ▼
+~1 building draw call
+
+
+Many Lines
+      │
+      ▼
+Merged LineSegments
+      │
+      ▼
+Small fixed number of draw calls
+```
+
+The result is that total draw calls remain roughly constant as city size increases.
+
+This is particularly useful on lower-end hardware, where **draw-call overhead can become a more significant bottleneck than raw triangle count**.
+
+---
+
+# Determinism
+
+The procedural systems use seeded generation.
+
+That means a given seed can reproduce the same generated world state rather than producing a completely different city on every run.
+
+This is especially important for the Megacity vertical slice, where terrain and generation state are exposed through diagnostics.
+
+Deterministic generation also makes procedural changes easier to debug because the same input can be regenerated repeatedly.
+
+The Soviet Brutalist city takes determinism a step further: it uses zero randomness and authored coordinate tables, making it perfectly reproducible and symmetric across every run.
+
+---
+
+# Known Rough Edges
+
+This is still an active work in progress.
+
+### Glitch Cubes
+
+The glitch cubes are an early implementation and are intentionally toned down.
+
+They're currently treated as a WIP visual effect rather than a finished part of the environment design.
+
+### No Bloom / Glow Post-Processing Yet
+
+The reference aesthetic relies heavily on bloom and atmospheric glow.
+
+The current implementation does not yet use post-processing.
+
+The most obvious future addition would be:
+
+```text
+EffectComposer
+      +
+UnrealBloomPass
+```
+
+This would likely produce the largest visual improvement relative to the current renderer.
+
+However, it would also introduce additional GPU cost, particularly on older hardware, so it is intentionally treated as a separate rendering trade-off rather than simply enabling it by default.
+
+### Browser Validation
+
+The project was syntax/import checked during the file split, but the resulting version was not executed inside an actual browser from the environment where that refactor was performed because a headless browser was unavailable.
+
+If the project fails to load, the browser console should therefore be checked first.
+
+Import/module path errors are a more likely cause than a fundamental procedural-generation failure, since the generation logic itself was carried over from a previously tested and working version.
+
+---
+
+# Current Status
+
+**Active WIP**
+
+The current implementation has the core procedural city, Soviet brutalist city, modular cities subsystem, world profiles, explicit scene lifecycle, deterministic megacity terrain, camera replay system, runtime diagnostics and GPU-conscious rendering architecture in place.
+
+The **Megacity Vertical Slice** is the current foundation for expanding the world with additional districts, roads, structures and visual effects.
 
 ---
 
