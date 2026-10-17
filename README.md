@@ -60,7 +60,7 @@ The project can therefore be deployed directly to GitHub Pages or another static
 
 # World Modes
 
-The project currently has two world profiles.
+The project currently has three world profiles.
 
 ### Legacy City
 
@@ -84,11 +84,24 @@ It currently contains:
 
 The older outer districts are intentionally absent while they're being rebuilt, and Phase 2 roads are not currently active.
 
+### Soviet Brutalist City
+
+An authored, axial, and symmetric city generator with zero randomness.
+
+It features:
+
+* A monumental central axis: stepped House of Soviets monolith, Red Star obelisks, central civic square, 6-lane prospekt, river bridge, and monument roundabout with a colossal statue and colonnade
+* Eight showpiece towers (tiered with spires or concrete ziggurats)
+* Residential microraion superblocks with schools, shops, and kindergartens
+* Industrial belt with wireframe cooling towers, factories, and chimneys
+* Fenced perimeter ring road with radial watchtowers
+* Cold pale grey edge/window palette with signature crimson red accents
+
 ---
 
 # World Lifecycle
 
-Both world profiles implement the same lifecycle:
+All world profiles implement the same lifecycle:
 
 ```js
 init(ctx)
@@ -113,6 +126,26 @@ while the application-level coordination happens through:
 ```text
 js/main.js
 ```
+
+---
+
+# Cities Subsystem (`js/cities/`)
+
+Cities are organized in `js/cities/` and registered in `js/cities/registry.js`.
+
+The UI (segmented controls and select dropdown), World Card metadata, telemetry, and per-world color palettes are generated dynamically from this registry.
+
+### Adding a New City
+
+Adding a new procedural city requires no changes to HTML, CSS, or UI code:
+
+1. Copy `js/cities/template.js` to `js/cities/<your-city>.js`.
+2. Implement the generator returning the standard data contract (`buildingBoxes`, `edgeVerts`, `windowVerts`, `accentVerts`, `groundVerts`, `centerlineVerts`, `roadList`).
+3. Register it in `js/cities/registry.js` by importing and adding it to `CITIES`.
+4. Validate in terminal:
+   ```bash
+   node js/cities/validate.js <your-city-id>
+   ```
 
 ---
 
@@ -250,6 +283,20 @@ css/
     └── HUD, buttons and settings panel
 
 js/
+├── cities/
+│   ├── registry.js
+│   │   └── Central city registry driving dynamic UI and lifecycles
+│   ├── template.js
+│   │   └── Starter template for new city generators
+│   ├── validate.js
+│   │   └── Standalone Node CLI validation suite
+│   ├── legacy.js
+│   │   └── Legacy procedural city profile
+│   ├── megacity.js
+│   │   └── Megacity vertical slice profile
+│   └── soviet.js
+│       └── Soviet Brutalist city generator and profile
+│
 ├── rng.js
 │   └── Seeded random number generator
 │
@@ -269,7 +316,10 @@ js/
 ├── city-generator.js
 │   └── Core procedural generator:
 │       roads, blocks and buildings
-│       Returns plain data — no Three.js
+│       Returns plain data — no Three.js (re-exports from js/cities/legacy.js)
+│
+├── soviet-generator.js
+│   └── Re-export for backward compatibility
 │
 ├── glitch-cubes.js
 │   └── Small cubes protruding from building walls
@@ -291,13 +341,16 @@ js/
 │   └── Camera waypoint capture, validation and playback
 │
 ├── ui.js
-│   └── HUD buttons and settings controls
+│   └── HUD buttons, dynamic world profile selector and settings controls
 │
 ├── lifecycle.js
 │   └── Explicit init / update / dispose world lifecycle
 │
 ├── megacity-generator.js
 │   └── Seeded terrace + vertical-slice generator
+│
+├── SKILL.md
+│   └── Comprehensive architecture and engineering guide for devs & AI
 │
 └── main.js
     └── Application entry point and system coordination
@@ -452,6 +505,8 @@ This is especially important for the Megacity vertical slice, where terrain and 
 
 Deterministic generation also makes procedural changes easier to debug because the same input can be regenerated repeatedly.
 
+The Soviet Brutalist city takes determinism a step further: it uses zero randomness and authored coordinate tables, making it perfectly reproducible and symmetric across every run.
+
 ---
 
 # Known Rough Edges
@@ -496,7 +551,7 @@ Import/module path errors are a more likely cause than a fundamental procedural-
 
 **Active WIP**
 
-The current implementation has the core procedural city, world profiles, explicit scene lifecycle, deterministic megacity terrain, camera replay system, runtime diagnostics and GPU-conscious rendering architecture in place.
+The current implementation has the core procedural city, Soviet brutalist city, modular cities subsystem, world profiles, explicit scene lifecycle, deterministic megacity terrain, camera replay system, runtime diagnostics and GPU-conscious rendering architecture in place.
 
 The **Megacity Vertical Slice** is the current foundation for expanding the world with additional districts, roads, structures and visual effects.
 
