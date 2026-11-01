@@ -543,6 +543,25 @@ export function createCameraReplay(cameraControls, scene) {
       cameraControls.setReplayPose(curPose);
       notifyStatus();
     },
+    scroll: (deltaY) => {
+      const total = getPlaybackDuration();
+      if (!Number.isFinite(deltaY) || total <= 0) return;
+      const normalizedDelta = Math.max(-1, Math.min(1, deltaY / 1000));
+      const step = Math.max(total * 0.005, Math.abs(normalizedDelta) * total * 0.2);
+      const current = playing ? elapsed : getStatus().elapsed;
+      const next = current + Math.sign(normalizedDelta) * step;
+      if (playing) playing = false;
+      const clamped = Math.max(0, Math.min(total, next));
+      elapsed = clamped;
+      const curPose = poseAt(elapsed);
+      replayPoseActive = true;
+      if (progressMarker && pathVisible) {
+        progressMarker.visible = true;
+        progressMarker.position.copy(curPose.position);
+      }
+      cameraControls.setReplayPose(curPose);
+      notifyStatus();
+    },
     seekWaypoint: (index) => {
       if (!Number.isInteger(index) || index < 0 || index >= waypoints.length) return;
       const time = getWaypointTime(index);

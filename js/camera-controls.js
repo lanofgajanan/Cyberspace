@@ -42,6 +42,7 @@ export function createCameraControls(camera, domElement, options) {
   const FLY_SPEED_BASE = 1.1;
   let flySpeedScale = 1.0;
   let replayPose = null;
+  let scrollHandler = null;
   const ROLL_SPEED = 1.8;
   const poseCamera = new THREE.Object3D();
 
@@ -119,6 +120,10 @@ export function createCameraControls(camera, domElement, options) {
 
   domElement.addEventListener("wheel", (e) => {
     e.preventDefault();
+    if (scrollHandler) {
+      scrollHandler(e.deltaY, e);
+      return;
+    }
     if (flying) return;
     targetRadius *= 1 + e.deltaY * 0.0012;
     targetRadius = Math.max(8, Math.min(3600, targetRadius));
@@ -424,6 +429,7 @@ export function createCameraControls(camera, domElement, options) {
     resetRoll,
     syncFromPose,
     getCamera: () => camera,
+    setScrollHandler: (handler) => { scrollHandler = typeof handler === "function" ? handler : null; },
     setReplayPose: (pose) => { replayPose = pose; },
     clearReplayPose: () => { replayPose = null; },
   };

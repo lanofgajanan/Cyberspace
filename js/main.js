@@ -206,6 +206,18 @@ if (loadingRetry) loadingRetry.addEventListener("click", () => selectMode(select
 
 const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, cameraControls, replay, camera, renderer);
 
+async function loadScrollReplay() {
+  try {
+    const response = await fetch("./cyberspace-replay.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    replay.importJSON(await response.text());
+    cameraControls.setScrollHandler(replay.scroll);
+  } catch (error) {
+    console.error("Failed to load the default scroll camera path.", error);
+    cameraControls.setScrollHandler(null);
+  }
+}
+
 let last = performance.now();
 let statsLastAt = last;
 let statsFrameCount = 0;
@@ -281,4 +293,5 @@ function animate(now) {
 requestAnimationFrame(animate);
 
 window.cyberspace = { lifecycle, replay, cameraControls, ui };
+loadScrollReplay();
 selectMode(modeSelect ? modeSelect.value : "legacy");
