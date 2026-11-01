@@ -291,6 +291,9 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   const replayUndoBtn = document.getElementById("replay-undo");
   const replayPlayBtn = document.getElementById("replay-play");
   const replayLoopBtn = document.getElementById("replay-loop");
+  const replayDurationDecreaseBtn = document.getElementById("replay-duration-decrease");
+  const replayDurationIncreaseBtn = document.getElementById("replay-duration-increase");
+  const replayCaptureDuration = document.getElementById("replay-capture-duration");
   const replayTogglePathBtn = document.getElementById("replay-toggle-path");
   const replayStatus = document.getElementById("replay-status");
 
@@ -319,8 +322,12 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   }
 
   function handleCapture() {
-    replay.capture();
-    setActiveTab("replay");
+    try {
+      replay.capture();
+      setActiveTab("replay");
+    } catch (error) {
+      if (replayStatus) replayStatus.textContent = `Capture error: ${error.message}`;
+    }
   }
 
   if (replayCaptureBtn) replayCaptureBtn.addEventListener("click", handleCapture);
@@ -328,7 +335,24 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   if (replayUndoBtn) replayUndoBtn.addEventListener("click", () => replay.undo());
   if (replayPlayBtn) replayPlayBtn.addEventListener("click", handlePlayToggle);
   if (telemetryReplayPlay) telemetryReplayPlay.addEventListener("click", handlePlayToggle);
-  if (replayLoopBtn) replayLoopBtn.addEventListener("click", () => (replay.toggleLoop ? replay.toggleLoop() : null));
+  if (replayLoopBtn) {
+    replayLoopBtn.addEventListener("click", () => {
+      if (replay.toggleReturnToStart) replay.toggleReturnToStart();
+      else if (replay.toggleLoop) replay.toggleLoop();
+    });
+  }
+  if (replayDurationDecreaseBtn && replay.setCaptureDuration) {
+    replayDurationDecreaseBtn.addEventListener("click", () => {
+      const current = replay.getStatus().captureDuration;
+      replay.setCaptureDuration(current - 0.5);
+    });
+  }
+  if (replayDurationIncreaseBtn && replay.setCaptureDuration) {
+    replayDurationIncreaseBtn.addEventListener("click", () => {
+      const current = replay.getStatus().captureDuration;
+      replay.setCaptureDuration(current + 0.5);
+    });
+  }
 
   if (replayTogglePathBtn && replay.togglePath) {
     replayTogglePathBtn.addEventListener("click", () => {
@@ -341,11 +365,24 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   if (telemetryTimeline) {
     telemetryTimeline.addEventListener("click", (e) => {
       const rect = telemetryTimeline.getBoundingClientRect();
-      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
       const s = replay.getStatus ? replay.getStatus() : null;
       if (s && s.duration > 0 && replay.seek) {
         replay.seek(pct * s.duration);
       }
+    });
+    telemetryTimeline.addEventListener("keydown", (e) => {
+      const s = replay.getStatus ? replay.getStatus() : null;
+      if (!s || s.duration <= 0 || !replay.seek) return;
+      const step = s.duration * (e.shiftKey ? 0.1 : 0.01);
+      let nextTime;
+      if (e.key === "ArrowRight" || e.key === "ArrowUp") nextTime = s.elapsed + step;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowDown") nextTime = s.elapsed - step;
+      else if (e.key === "Home") nextTime = 0;
+      else if (e.key === "End") nextTime = s.duration;
+      else return;
+      e.preventDefault();
+      replay.seek(nextTime);
     });
   }
 
@@ -374,9 +411,24 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
       if (telemetryReplayDuration) telemetryReplayDuration.textContent = durationStr;
       if (telemetryElapsedBar) telemetryElapsedBar.style.width = `${pct}%`;
       if (telemetryPlayhead) telemetryPlayhead.style.left = `${pct}%`;
+      if (telemetryTimeline) {
+        telemetryTimeline.setAttribute("aria-valuenow", String(Math.round(pct)));
+        telemetryTimeline.setAttribute("aria-valuetext", `${s.elapsed.toFixed(1)} of ${s.duration.toFixed(1)} seconds`);
+      }
 
       if (replayLoopBtn) {
-        replayLoopBtn.textContent = s.looping ? "Loop: On" : "Loop: Off";
+        const enabled = s.returnToStart !== undefined ? s.returnToStart : s.looping;
+        replayLoopBtn.textContent = enabled ? "Return to Start: On" : "Return to Start: Off";
+        replayLoopBtn.setAttribute("aria-pressed", String(Boolean(enabled)));
+      }
+      if (replayCaptureDuration && Number.isFinite(s.captureDuration)) {
+        replayCaptureDuration.textContent = `${s.captureDuration.toFixed(1)}s`;
+      }
+      if (replayDurationDecreaseBtn && Number.isFinite(s.captureDuration)) {
+        replayDurationDecreaseBtn.disabled = s.captureDuration <= 0.5;
+      }
+      if (replayDurationIncreaseBtn && Number.isFinite(s.captureDuration)) {
+        replayDurationIncreaseBtn.disabled = s.captureDuration >= 30;
       }
       if (replayTogglePathBtn && s.pathVisible !== undefined) {
         replayTogglePathBtn.textContent = s.pathVisible ? "Hide Path" : "Show Path";

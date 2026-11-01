@@ -615,6 +615,17 @@ select:focus-visible {
   color: var(--accent);
 }
 
+.ctl-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ctl-btn:disabled:hover {
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--paper);
+}
+
 .ctl-btn--block {
   width: 100%;
 }
@@ -803,6 +814,35 @@ select:focus-visible {
   margin-top: 12px;
 }
 
+.replay-duration-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--muted);
+  font: 400 8px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.replay-duration-stepper {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.replay-duration-value {
+  min-width: 48px;
+  color: var(--paper);
+  text-align: center;
+  font: 500 10px var(--mono);
+}
+
+.replay-duration-hint {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 /* =====================================================================
    BOTTOM TELEMETRY BAR
 ===================================================================== */
@@ -896,6 +936,11 @@ select:focus-visible {
   height: 20px;
   flex: 1;
   cursor: pointer;
+}
+
+.timeline:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .timeline::before {
