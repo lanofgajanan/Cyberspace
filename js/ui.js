@@ -296,6 +296,7 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
   const replayCaptureDuration = document.getElementById("replay-capture-duration");
   const replayTogglePathBtn = document.getElementById("replay-toggle-path");
   const replayStatus = document.getElementById("replay-status");
+  const replayWaypointSelect = document.getElementById("replay-waypoint-select");
 
   const telemetryReplayPlay = document.getElementById("telemetry-replay-play");
   const telemetryReplayElapsed = document.getElementById("telemetry-replay-elapsed");
@@ -358,6 +359,11 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
     replayTogglePathBtn.addEventListener("click", () => {
       const visible = replay.togglePath();
       replayTogglePathBtn.textContent = visible ? "Hide Path" : "Show Path";
+    });
+  }
+  if (replayWaypointSelect && replay.seekWaypoint) {
+    replayWaypointSelect.addEventListener("change", () => {
+      if (replayWaypointSelect.value !== "") replay.seekWaypoint(Number(replayWaypointSelect.value));
     });
   }
 
@@ -432,6 +438,20 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
       }
       if (replayTogglePathBtn && s.pathVisible !== undefined) {
         replayTogglePathBtn.textContent = s.pathVisible ? "Hide Path" : "Show Path";
+      }
+      if (replayWaypointSelect && replay.getNamedWaypoints) {
+        const namedWaypoints = replay.getNamedWaypoints();
+        const selected = replayWaypointSelect.value;
+        replayWaypointSelect.replaceChildren(new Option("Select a named waypoint", ""));
+        for (const waypoint of namedWaypoints) {
+          replayWaypointSelect.appendChild(new Option(
+            `${waypoint.number}. ${waypoint.label} (${formatTimecode(waypoint.time)})`,
+            String(waypoint.index)
+          ));
+        }
+        if (namedWaypoints.some((waypoint) => String(waypoint.index) === selected)) {
+          replayWaypointSelect.value = selected;
+        }
       }
     });
   }

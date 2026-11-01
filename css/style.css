@@ -824,6 +824,21 @@ select:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.replay-waypoint-picker {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.replay-waypoint-picker select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--paper);
+  font: 400 9px var(--mono);
+}
+
 .replay-duration-stepper {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

@@ -8,6 +8,16 @@ const MAX_WAYPOINTS = 1000;
 const MAX_SEGMENT_DURATION = 600;
 const MAX_ROUTE_DURATION = 3600;
 const MAX_COORDINATE = 1_000_000;
+const MIN_DISTANCE_DURATION = 0.5;
+const DEFAULT_DISTANCE_SPEED = 60;
+const NAMED_WAYPOINT_LABELS = {
+  14: "Waypoint 14",
+  18: "Waypoint 18",
+  32: "Waypoint 32",
+  38: "Waypoint 38",
+  40: "Waypoint 40",
+  42: "About Me — Part 3",
+};
 
 export function createCameraReplay(cameraControls, scene) {
   let waypoints = [];
@@ -255,6 +265,41 @@ export function createCameraReplay(cameraControls, scene) {
     return getTotalDuration() + (returnToStart ? waypoints[waypoints.length - 1].duration : 0);
   }
 
+  function getWaypointTime(index) {
+    return waypoints.slice(0, Math.max(0, index)).reduce((sum, waypoint) => sum + waypoint.duration, 0);
+  }
+
+  function distanceBetween(aPosition, bPosition) {
+    return Math.hypot(
+      bPosition[0] - aPosition[0],
+      bPosition[1] - aPosition[1],
+      bPosition[2] - aPosition[2]
+    );
+  }
+
+  function normalizeDurations(inputWaypoints) {
+    if (inputWaypoints.length < 2) return inputWaypoints;
+    const speeds = inputWaypoints.slice(0, -1)
+      .map((waypoint, index) => {
+        const distance = distanceBetween(waypoint.position, inputWaypoints[index + 1].position);
+        return distance > 1e-6 && Number.isFinite(waypoint.duration)
+          ? distance / waypoint.duration
+          : 0;
+      })
+      .filter((speed) => speed > 1e-6 && Number.isFinite(speed))
+      .sort((left, right) => left - right);
+    const speed = speeds.length
+      ? speeds[Math.floor(speeds.length / 2)]
+      : DEFAULT_DISTANCE_SPEED;
+
+    return inputWaypoints.map((waypoint, index) => {
+      if (index >= inputWaypoints.length - 1) return waypoint;
+      const distance = distanceBetween(waypoint.position, inputWaypoints[index + 1].position);
+      const duration = Math.max(MIN_DISTANCE_DURATION, Math.min(MAX_SEGMENT_DURATION, distance / speed));
+      return { ...waypoint, duration };
+    });
+  }
+
   function getStatus() {
     return {
       count: waypoints.length,
@@ -304,13 +349,17 @@ export function createCameraReplay(cameraControls, scene) {
         position: waypoint.position.slice(),
         quaternion: waypoint.quaternion.map((value) => value / quaternionLength),
         duration: waypoint.duration,
+        label: typeof waypoint.label === "string" && waypoint.label.trim()
+          ? waypoint.label.trim().slice(0, 120)
+          : (NAMED_WAYPOINT_LABELS[index + 1] || ""),
       };
     });
 
-    if (validatedWaypoints.reduce((sum, waypoint) => sum + waypoint.duration, 0) > MAX_ROUTE_DURATION) {
+    const normalizedWaypoints = normalizeDurations(validatedWaypoints);
+    if (normalizedWaypoints.reduce((sum, waypoint) => sum + waypoint.duration, 0) > MAX_ROUTE_DURATION) {
       throw new Error(`Replay duration must not exceed ${MAX_ROUTE_DURATION} seconds.`);
     }
-    return validatedWaypoints;
+    return normalizedWaypoints;
   }
 
   function capture(duration = captureDuration) {
@@ -324,7 +373,18 @@ export function createCameraReplay(cameraControls, scene) {
     if (routeDuration + duration > MAX_ROUTE_DURATION) {
       throw new Error(`Replay duration must not exceed ${MAX_ROUTE_DURATION} seconds.`);
     }
-    waypoints.push({ position: cameraControls.getCamera().position.toArray(), quaternion: cameraControls.getCamera().quaternion.toArray(), duration });
+    const position = cameraControls.getCamera().position.toArray();
+    const previous = waypoints[waypoints.length - 1];
+    const distance = previous ? distanceBetween(previous.position, position) : 0;
+    const durationFromDistance = previous && distance > 1e-6
+      ? Math.max(MIN_DISTANCE_DURATION, Math.min(MAX_SEGMENT_DURATION, distance / DEFAULT_DISTANCE_SPEED))
+      : duration;
+    waypoints.push({
+      position,
+      quaternion: cameraControls.getCamera().quaternion.toArray(),
+      duration: durationFromDistance,
+      label: "",
+    });
     notifyStatus(true);
   }
 
@@ -458,6 +518,9 @@ export function createCameraReplay(cameraControls, scene) {
       notifyStatus(true);
     },
     getWaypoints: () => waypoints,
+    getNamedWaypoints: () => waypoints
+      .map((waypoint, index) => ({ index, number: index + 1, label: waypoint.label || "", time: getWaypointTime(index) }))
+      .filter((waypoint) => waypoint.label),
     play,
     stop,
     togglePlay,
@@ -472,6 +535,19 @@ export function createCameraReplay(cameraControls, scene) {
       if (total <= 0) return;
       elapsed = Math.max(0, Math.min(total, time));
       const curPose = poseAt(elapsed);
+      replayPoseActive = true;
+      if (progressMarker && pathVisible) {
+        progressMarker.visible = true;
+        progressMarker.position.copy(curPose.position);
+      }
+      cameraControls.setReplayPose(curPose);
+      notifyStatus();
+    },
+    seekWaypoint: (index) => {
+      if (!Number.isInteger(index) || index < 0 || index >= waypoints.length) return;
+      const time = getWaypointTime(index);
+      const curPose = poseAt(time);
+      elapsed = time;
       replayPoseActive = true;
       if (progressMarker && pathVisible) {
         progressMarker.visible = true;
