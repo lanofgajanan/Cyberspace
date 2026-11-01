@@ -573,6 +573,7 @@ export function wireUI(getSceneObjects, cameraControls, replay, camera, renderer
       cameraControls.setDriftSpeed(0.0015);
       cameraControls.setPanSpeedScale(1.0);
       cameraControls.setFlySpeedScale(1.0);
+      if (cameraControls.resetRoll) cameraControls.resetRoll();
       if (cameraControls.setEase) cameraControls.setEase(0.16);
       if (camera) {
         camera.fov = 55;

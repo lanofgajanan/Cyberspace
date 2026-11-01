@@ -16,6 +16,8 @@ export function createCameraControls(camera, domElement, options) {
   let camAzimuth = opts.azimuth || 0.6;
   let camPolar = opts.polar || 1.05;
   let targetRadius = camRadius, targetAzimuth = camAzimuth, targetPolar = camPolar;
+  let camRoll = 0;
+  let targetRoll = 0;
 
   const PAN_LIMIT = opts.panLimit || 330;
   let easeDecayRate = 10.5;
@@ -40,6 +42,8 @@ export function createCameraControls(camera, domElement, options) {
   const FLY_SPEED_BASE = 1.1;
   let flySpeedScale = 1.0;
   let replayPose = null;
+  const ROLL_SPEED = 1.8;
+  const poseCamera = new THREE.Object3D();
 
   const PRESETS = {
     overview: { target: { x: 0, y: 15, z: 0 }, radius: 520, azimuth: 0.6, polar: 0.85 },
@@ -54,6 +58,7 @@ export function createCameraControls(camera, domElement, options) {
       camTarget.z + camRadius * Math.sin(camPolar) * Math.cos(camAzimuth)
     );
     camera.lookAt(camTarget.x, camTarget.y, camTarget.z);
+    camera.rotateZ(camRoll);
   }
   updateCameraPosition();
 
@@ -167,14 +172,36 @@ export function createCameraControls(camera, domElement, options) {
     flyVel.y = 0;
     flyVel.z = 0;
   }
+  function resetRoll() {
+    camRoll = 0;
+    targetRoll = 0;
+  }
+  function isTypingTarget(target) {
+    return target && (
+      target.tagName === "INPUT"
+      || target.tagName === "SELECT"
+      || target.tagName === "TEXTAREA"
+      || target.isContentEditable
+    );
+  }
   window.addEventListener("keydown", (e) => {
-    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT")) return;
+    if (isTypingTarget(document.activeElement)) return;
     if (e.code === "Space") e.preventDefault(); // stop page scroll — Space is "fly up"
     keysDown[e.code] = true;
   });
-  window.addEventListener("keyup", (e) => { keysDown[e.code] = false; });
-  window.addEventListener("blur", clearKeys);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) clearKeys(); });
+  window.addEventListener("keyup", (e) => {
+    keysDown[e.code] = false;
+  });
+  window.addEventListener("blur", () => {
+    clearKeys();
+    resetRoll();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      clearKeys();
+      resetRoll();
+    }
+  });
   document.addEventListener("pointerlockchange", () => {
     clearKeys();
     const indicator = document.getElementById("fly-lock-indicator");
@@ -233,6 +260,7 @@ export function createCameraControls(camera, domElement, options) {
 
     camera.position.set(flyPos.x, flyPos.y, flyPos.z);
     camera.lookAt(flyPos.x + fwd.x, flyPos.y + fwd.y, flyPos.z + fwd.z);
+    camera.rotateZ(camRoll);
   }
 
   function setFlyMode(enabled) {
@@ -281,7 +309,18 @@ export function createCameraControls(camera, domElement, options) {
     if (diff < -Math.PI) diff += twoPi;
     if (diff > Math.PI) diff -= twoPi;
     targetAzimuth = camAzimuth + diff;
+    resetRoll();
     lastInputTime = performance.now();
+  }
+
+  function applyRoll(dt) {
+    const direction = (keysDown.KeyQ ? 1 : 0) - (keysDown.KeyE ? 1 : 0);
+    if (direction) {
+      targetRoll += direction * ROLL_SPEED * dt;
+      if (targetRoll > Math.PI) targetRoll -= Math.PI * 2;
+      if (targetRoll < -Math.PI) targetRoll += Math.PI * 2;
+      lastInputTime = performance.now();
+    }
   }
 
   function applyPan(dt) {
@@ -310,6 +349,13 @@ export function createCameraControls(camera, domElement, options) {
     camera.quaternion.copy(quaternion);
 
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+    poseCamera.position.copy(position);
+    poseCamera.lookAt(position.x + fwd.x, position.y + fwd.y, position.z + fwd.z);
+    const rollDelta = poseCamera.quaternion.clone().invert().multiply(quaternion);
+    camRoll = targetRoll = Math.atan2(
+      2 * (rollDelta.w * rollDelta.z + rollDelta.x * rollDelta.y),
+      1 - 2 * (rollDelta.y * rollDelta.y + rollDelta.z * rollDelta.z)
+    );
     const aheadDist = Math.max(30, Math.min(camRadius, 180));
 
     if (flying) {
@@ -341,10 +387,14 @@ export function createCameraControls(camera, domElement, options) {
       return;
     }
     if (flying) {
+      applyRoll(delta);
+      const ease = 1 - Math.exp(-easeDecayRate * delta);
+      camRoll += (targetRoll - camRoll) * ease;
       tickFly(delta);
       return;
     }
 
+    applyRoll(delta);
     applyPan(delta);
     if (driftEnabled) targetAzimuth += driftSpeed * (delta * 60);
 
@@ -355,6 +405,7 @@ export function createCameraControls(camera, domElement, options) {
     camAzimuth += (targetAzimuth - camAzimuth) * ease;
     camPolar += (targetPolar - camPolar) * ease;
     camRadius += (targetRadius - camRadius) * ease;
+    camRoll += (targetRoll - camRoll) * ease;
     updateCameraPosition();
   }
 
@@ -370,6 +421,7 @@ export function createCameraControls(camera, domElement, options) {
     setFlySpeedScale: (v) => { flySpeedScale = v; },
     setEase: (v) => { easeDecayRate = Math.max(2, Math.min(32, v * 65)); },
     applyPreset,
+    resetRoll,
     syncFromPose,
     getCamera: () => camera,
     setReplayPose: (pose) => { replayPose = pose; },
