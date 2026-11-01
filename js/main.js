@@ -25,6 +25,10 @@ renderer.setSize(initialW, initialH);
 canvasWrap.appendChild(renderer.domElement);
 const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 18, radius: 520, azimuth: 0.6, polar: 1.05, panLimit: 430 });
 const replay = createCameraReplay(cameraControls, scene);
+const pendingScrollDeltas = [];
+cameraControls.setScrollHandler((deltaY) => {
+  pendingScrollDeltas.push(deltaY);
+});
 const lifecycle = createLifecycle(({ mode, onProgress }) => {
   const city = getCity(mode);
   if (city.seedNumber) {
@@ -208,12 +212,15 @@ const ui = wireUI(() => lifecycle.active && lifecycle.active.sceneObjects, camer
 
 async function loadScrollReplay() {
   try {
-    const response = await fetch("./cyberspace-replay.json", { cache: "no-store" });
+    const replayURL = new URL("../cyberspace-replay.json", import.meta.url);
+    const response = await fetch(replayURL, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     replay.importJSON(await response.text());
     cameraControls.setScrollHandler(replay.scroll);
+    for (const deltaY of pendingScrollDeltas.splice(0)) replay.scroll(deltaY);
   } catch (error) {
     console.error("Failed to load the default scroll camera path.", error);
+    pendingScrollDeltas.length = 0;
     cameraControls.setScrollHandler(null);
   }
 }
