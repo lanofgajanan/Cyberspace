@@ -25,6 +25,7 @@ renderer.setSize(initialW, initialH);
 canvasWrap.appendChild(renderer.domElement);
 const cameraControls = createCameraControls(camera, renderer.domElement, { targetY: 18, radius: 520, azimuth: 0.6, polar: 1.05, panLimit: 430 });
 const replay = createCameraReplay(cameraControls, scene);
+let defaultScrollReplayReady = false;
 const pendingScrollDeltas = [];
 cameraControls.setScrollHandler((deltaY) => {
   pendingScrollDeltas.push(deltaY);
@@ -68,7 +69,7 @@ const lifecycle = createLifecycle(({ mode, onProgress }) => {
     runtimeStatsEl.textContent =
       `FPS: -- · draw calls: -- · segments: ${cityData.roadList ? cityData.roadList.length : 0} · generation: ${Math.round(generationMs)}ms`;
   }
-  cameraControls.setReplayPose(null);
+  if (!defaultScrollReplayReady) cameraControls.setReplayPose(null);
   return {
     update: (dt) => sceneObjects.update(dt),
     dispose: () => sceneObjects.dispose(),
@@ -143,7 +144,7 @@ async function selectMode(mode) {
     }
     if (request !== loadRequest) return;
     setLoadingProgress(78, "Building render geometry");
-    cameraControls.clearReplayPose();
+    if (!defaultScrollReplayReady) cameraControls.clearReplayPose();
     if (ui && ui.syncSceneSettings && active.sceneObjects) {
       ui.syncSceneSettings(active.sceneObjects);
     }
@@ -216,6 +217,7 @@ async function loadScrollReplay() {
     const response = await fetch(replayURL, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     replay.importJSON(await response.text());
+    defaultScrollReplayReady = true;
     cameraControls.setScrollHandler(replay.scroll);
     for (const deltaY of pendingScrollDeltas.splice(0)) replay.scroll(deltaY);
   } catch (error) {
