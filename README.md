@@ -382,7 +382,15 @@ The current split therefore follows **actual system boundaries**, rather than si
 
 The replay system records camera waypoints and reconstructs the camera path during playback.
 
-Position interpolation uses **per-segment Hermite timing**, while camera orientation uses **quaternion slerp**.
+Position interpolation uses a **Catmull–Rom spline**, while camera orientation uses **quaternion slerp**.
+Each waypoint's duration is the travel time from that waypoint to the next one. The Replay menu's
+`New Segment Travel` buttons select the duration stored on subsequently captured waypoints; they
+do not change durations already in the route or in imported replay data. New captures default to
+3 seconds and can be set from 0.5 to 30 seconds in 0.5-second steps.
+
+`Return to Start` adds a smooth final segment from the last waypoint back to the first, using the
+last waypoint's stored duration. When enabled, playback repeats from the first waypoint after that
+segment; when disabled, playback stops at the last waypoint.
 
 Conceptually:
 
@@ -403,6 +411,9 @@ Orientation is interpolated independently using quaternion spherical linear inte
 Replay data can also be exported and imported as JSON.
 
 Imported replay data is validated before being accepted.
+Imports must contain 2–1,000 waypoints, finite positions within ±1,000,000 world units, non-zero
+finite quaternions, and positive per-segment durations no longer than 600 seconds. The total of
+stored waypoint durations may not exceed one hour.
 
 During playback:
 

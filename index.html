@@ -273,11 +273,21 @@
 
         <div id="replay-status" class="diagnostics-box">Waypoints: 0 (0.0s)</div>
 
+        <div class="replay-duration-controls" aria-label="New segment travel duration">
+          <span class="replay-duration-label">NEW SEGMENT TRAVEL</span>
+          <div class="replay-duration-stepper">
+            <button id="replay-duration-decrease" class="ctl-btn" type="button" aria-label="Decrease new segment travel duration">−</button>
+            <output id="replay-capture-duration" class="replay-duration-value" aria-live="polite">3.0s</output>
+            <button id="replay-duration-increase" class="ctl-btn" type="button" aria-label="Increase new segment travel duration">+</button>
+          </div>
+          <span class="replay-duration-hint">Stored on each captured waypoint</span>
+        </div>
+
         <div class="replay-action-grid">
           <button id="replay-capture" class="ctl-btn" type="button">Capture Waypoint</button>
           <button id="replay-undo" class="ctl-btn" type="button">Undo Waypoint</button>
           <button id="replay-play" class="ctl-btn" type="button">Play Replay</button>
-          <button id="replay-loop" class="ctl-btn" type="button">Loop: Off</button>
+          <button id="replay-loop" class="ctl-btn" type="button" aria-pressed="false">Return to Start: Off</button>
           <button id="replay-toggle-path" class="ctl-btn" type="button">Hide Path</button>
           <button id="replay-export" class="ctl-btn" type="button">Export JSON</button>
           <button id="replay-import" class="ctl-btn ctl-btn--block" style="grid-column: 1 / -1;" type="button">Import JSON</button>
@@ -507,7 +517,7 @@
 
       <span id="telemetry-replay-elapsed" class="replay__time">00:00</span>
 
-      <div class="timeline" id="telemetry-timeline" role="slider" aria-label="Replay timeline progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="timeline" id="telemetry-timeline" role="slider" tabindex="0" aria-label="Replay timeline progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0 seconds">
         <span class="timeline__elapsed" id="telemetry-elapsed-bar"></span>
         <span class="timeline__playhead" id="telemetry-playhead"></span>
       </div>
